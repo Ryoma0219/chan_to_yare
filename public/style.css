@@ -699,3 +699,4 @@ dialog.improve .composer { border-bottom: 0; padding-bottom: 0.75rem; }
 .launch .tool:disabled { opacity: 0.45; cursor: not-allowed; }
 .launch-note { font-size: var(--step--1); }
 .ended-name { font-size: var(--step--1); }
+.pr-session { display: grid; gap: 0.3rem; padding: 0.3rem 0; }

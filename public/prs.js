@@ -272,6 +272,31 @@ window.PRs = (() => {
     return b;
   }
 
+  // 動いているセッションは開き直さず、そのタブへ移る
+  function openButton(s) {
+    const wrap = h('span', 'launch');
+    const b = h('button', 'tool', 'Open');
+    b.type = 'button';
+    b.title = 'This session is running. Jump to its cmux tab.';
+    const note = h('span', 'launch-note muted');
+    note.setAttribute('role', 'status');
+    b.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      try {
+        const res = await ccdAuth.fetch('/api/focus', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CC-Dashboard': '1' },
+          body: JSON.stringify({ sessionId: s.id }),
+        });
+        note.textContent = res.ok ? '' : 'Could not find its cmux tab.';
+      } catch {
+        note.textContent = 'Could not find its cmux tab.';
+      }
+    });
+    wrap.append(b, note);
+    return wrap;
+  }
+
   function detailRow(p) {
     const tr = h('tr', 'pr-detail');
     const td = h('td');
@@ -283,8 +308,12 @@ window.PRs = (() => {
     if (!p.sessions.length) sess.append(h('p', 'muted', 'No session log found for this PR.'));
     const ul = h('ul', 'plain-list');
     for (const s of p.sessions) {
-      const li = h('li');
-      li.append(h('span', 'session-title', s.title ?? s.id.slice(0, 8)), h('span', 'muted', ` · ${s.prompts} prompts · ${usd(s.costUSD)}`));
+      const li = h('li', 'pr-session');
+      const ctx = window.Ended?.tokens(s.contextTokens);
+      const line = h('div');
+      line.append(h('span', 'session-title', s.title ?? s.id.slice(0, 8)), h('span', 'muted', ` · ${s.prompts} prompts · ${usd(s.costUSD)}${ctx ? ` · ${ctx} context` : ''}`));
+      li.append(line);
+      li.append(s.running ? openButton(s) : window.Ended?.launchButtons(s) ?? '');
       ul.append(li);
     }
     sess.append(ul);
