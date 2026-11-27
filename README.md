@@ -63,9 +63,12 @@ The name is Japanese for "do it properly."
 - Every PR you opened in the last 30 days, next to the Claude Code sessions behind it.
 - Four axes side by side, with no overall score: delegation, cost, speed, and quality guard.
 - A size and cost plot that marks PRs rewritten within 21 days or reverted.
+- Filter the table by state: draft, open, merged, or closed.
 - Open a row to see its sessions, reviews, and the PRs that rewrote its lines.
 
 ### Ended
+
+![The Ended view with a search box and Resume and Hand off buttons on each ended session](assets/screenshots/ended.png)
 
 - Every session from the last 31 days that is no longer running, newest first.
 - Search what you asked, titles, repositories, branches and PRs (`#123`), with Japanese and full-width spaces.

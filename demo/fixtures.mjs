@@ -1,4 +1,4 @@
-// Dummy data for README screenshots. Shapes match /api/state, /api/insights and /api/prs.
+// Dummy data for README screenshots. Shapes match /api/state, /api/insights, /api/prs and /api/ended.
 // Every timestamp is relative to `now`, so the screenshots look the same whenever they are taken.
 
 const MIN = 60 * 1000;
@@ -415,6 +415,8 @@ export function prs(now = Date.now()) {
           first: createdAt - (i + 1) * 2 * HOUR,
           last: createdAt - i * HOUR,
           costUSD: costUSD / titles.length,
+          contextTokens: Math.round(60000 + prompts * 14000 + rand() * 30000),
+          running: false,
         }))
       : [];
     return {
@@ -509,4 +511,61 @@ export function prs(now = Date.now()) {
     prs: list,
     error: null,
   };
+}
+
+/* ------------------------------------------------------------
+   Ended: /api/ended
+   ------------------------------------------------------------ */
+const ENDED = [
+  // [hoursAgo, title, repo, worktree, branch, prs [[repo, number]], contextTokens, first, last, extras]
+  [1.5, 'Move checkout to the Payment Element', 'storefront', 'payment-element', 'you/payment-element', [['storefront', 412]], 212000,
+    'Replace the Card Element on the checkout page with the Payment Element. Keep Apple Pay working.',
+    'Open a draft PR and list what is left for wallets.'],
+  [3.2, 'Retry failed webhooks with jittered backoff', 'billing-api', null, 'you/webhook-backoff', [['billing-api', 235]], 148000,
+    'Webhooks to slow customers keep failing. Retry them with exponential backoff and jitter, up to 24 hours.',
+    'The review asked for a dead letter queue. Add it.', { name: 'webhook retries' }],
+  [6.8, 'Why the nightly export job got slower', 'analytics', null, 'main', [], 96000,
+    'The nightly export took 3 hours last night instead of 40 minutes. Find out why.',
+    'Write the findings up as a comment on the incident ticket.'],
+  [9.5, 'Follow the system theme on the profile screen', 'mobile-app', null, 'you/system-theme', [['mobile-app', 187]], 305000,
+    'The profile screen ignores dark mode. Follow the system theme like the rest of the app.',
+    'Check it on Android 12 and on an old iPhone.'],
+  [20, 'Cache node_modules between CI jobs', 'infra', null, 'you/ci-cache', [['infra', 96]], 74000,
+    'CI spends 4 minutes installing dependencies on every job. Cache node_modules keyed on the lockfile.',
+    'Merged. Watch the next few runs and tell me the cache hit rate.'],
+  [26, 'Add a Tooltip component', 'design-system', 'tooltip', 'you/tooltip', [['design-system', 58]], 182000,
+    'Add a Tooltip that works with keyboard focus and respects reduced motion.',
+    'Add stories for the four placements.', { gone: true }],
+  [49, 'Prorate plan changes mid-cycle', 'billing-api', null, 'you/proration', [['billing-api', 231]], 468000,
+    'When a customer upgrades mid-cycle, charge only the difference for the rest of the period.',
+    'Add a test for a downgrade on the last day of the cycle.'],
+  [73, 'Weekly onboarding funnel query', 'analytics', null, 'main', [['analytics', 41]], 58000,
+    'Write a query for the weekly onboarding funnel: signup, first project, first invite.',
+    'Close the PR, we will use the dashboard instead.'],
+];
+
+export function ended(now = Date.now(), q = '') {
+  const prState = new Map(PR_LIST.map(([repo, number, title, state]) => [`${repo} ${number}`, { title, state }]));
+  const rows = ENDED.map(([hoursAgo, title, repo, worktree, branch, prs, contextTokens, first, last, x = {}], i) => ({
+    id: uuid(9000 + i),
+    title,
+    name: x.name ?? null,
+    repo,
+    worktree,
+    branch,
+    cwd: `~/code/${repo}${worktree ? `/.claude/worktrees/${worktree}` : ''}`,
+    lastActivityAt: now - Math.round(hoursAgo * HOUR),
+    firstPrompt: first,
+    lastPrompt: last,
+    lastReply: null,
+    contextTokens,
+    prs: prs.map(([r, n]) => ({ url: prUrl(r, n), number: n, ...(prState.get(`${r} ${n}`) ?? { title: null, state: null }) })),
+    match: null,
+    resumable: !x.gone,
+    handoffCwd: `~/code/${repo}`,
+  }));
+  const terms = String(q).normalize('NFKC').toLowerCase().split(/\s+/u).filter(Boolean);
+  if (!terms.length) return { sessions: rows };
+  const hay = (r) => [r.title, r.name, r.repo, r.worktree, r.branch, r.firstPrompt, r.lastPrompt, ...r.prs.flatMap((p) => [`#${p.number}`, p.title])].filter(Boolean).join('\n').toLowerCase();
+  return { sessions: rows.filter((r) => terms.every((t) => hay(r).includes(t))) };
 }

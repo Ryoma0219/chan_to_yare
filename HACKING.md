@@ -60,7 +60,8 @@ The current images were taken at 1440 px wide, 2x, in dark mode, with
 do not show half done. A full-page capture can still catch the week chart
 mid-animation, so set the viewport to the page height and capture the
 viewport instead. Live has the "Rate limit the invoices endpoint" row
-open, and PRs has `storefront #401` open and is cut off at 2376 px. The
+open, PRs has `storefront #401` open and is cut off at 2376 px, and Ended
+shows the full list with an empty search box (no focus ring). The
 notification button was hidden and sound was set to off, since both
 only show their attention state in a browser. They were then scaled to 1600 px wide
 (`sips --resampleWidth 1600`) and saved in `assets/screenshots/`.

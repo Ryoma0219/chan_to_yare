@@ -35,6 +35,7 @@ const server = http.createServer((req, res) => {
   if (req.method === 'GET' && url.pathname === '/api/state') return json(res, 200, fixtures.state());
   if (req.method === 'GET' && url.pathname === '/api/insights') return json(res, 200, fixtures.insights());
   if (req.method === 'GET' && url.pathname === '/api/prs') return json(res, 200, fixtures.prs());
+  if (req.method === 'GET' && url.pathname === '/api/ended') return json(res, 200, fixtures.ended(Date.now(), url.searchParams.get('q') ?? ''));
   if (req.method === 'GET' && url.pathname === '/api/events') {
     res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive' });
     res.write('retry: 2000\n\n');
