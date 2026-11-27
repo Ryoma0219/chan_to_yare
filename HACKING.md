@@ -11,15 +11,16 @@ dependencies.
 
 | Path                     | Role                                                                                          |
 | ------------------------ | --------------------------------------------------------------------------------------------- |
-| `server.mjs`             | HTTP server, SSE stream, and the API (`state`, `events`, `insights`, `prs`, `focus`, `memo`, `exit`, `improve`) |
+| `server.mjs`             | HTTP server, SSE stream, and the API (`state`, `events`, `insights`, `prs`, `ended`, `focus`, `memo`, `exit`, `improve`, `resume`, `handoff`) |
 | `lib/collect.mjs`        | Finds running sessions, decides their state, maps them to cmux tabs, jumps tabs, sends notes, ends sessions |
 | `lib/improve.mjs`        | Writes an Improve Claude request to a file and opens a new cmux workspace that runs it        |
+| `lib/ended.mjs`          | Lists and searches ended sessions, and opens them again with Resume or Hand off               |
 | `lib/transcript.mjs`     | Reads one conversation log incrementally and keeps its title, last exchange, and turns        |
 | `lib/analytics.mjs`      | Reads 31 days of conversation logs incrementally and builds the Last 7 days view              |
 | `lib/github.mjs`         | Fetches your pull requests, reviews, diffs, and reverts through `gh`, with a disk cache       |
 | `lib/prs.mjs`            | Links pull requests to sessions and computes the four axes of the PRs view                    |
 | `public/`                | The web UI: plain DOM and SVG, no framework                                                   |
-| `test/`                  | Tests for `lib/improve.mjs`, run with `npm test` (`node:test`, no dependencies)              |
+| `test/`                  | Tests for `lib/` and the server, run with `npm test` (`node:test`, no dependencies)          |
 | `public/themes.css`      | The color theme, as hues only                                                                 |
 | `macos/ChanToYare.swift` | The macOS app: a WKWebView window, Dock badge, notifications, sound, and menus                |
 | `macos/build.sh`         | Builds `~/Applications/Chan to Yare.app` with `swiftc` and signs it ad hoc                    |
@@ -77,8 +78,9 @@ only show their attention state in a browser. They were then scaled to 1600 px w
 Chan to Yare writes in four ways: it focuses a cmux tab
 (`select-workspace` and `focus-panel`), it sends a note to a session
 (`set-buffer`, `paste-buffer`, `send-key enter`), it ends a session by
-sending `/exit` the same way, and it opens a new workspace for Improve
-Claude (`new-workspace`). It never closes tabs or workspaces.
+sending `/exit` the same way, and it opens a new workspace
+(`new-workspace`) for Improve Claude, Resume, and Hand off. It never
+closes tabs or workspaces.
 
 ## Live
 
@@ -165,6 +167,47 @@ The leading space is deliberate. A new shell may show a countdown offering
 to resume an earlier session in the same directory, and that countdown
 reads the first key as "cancel". The space is that key. Without the
 countdown, the shell ignores it.
+
+## Ended
+
+The Ended view lists sessions from the last 31 days that are no longer
+running and have at least one prompt from you, newest first. It reuses the
+files `lib/analytics.mjs` already reads, which keep each session's prompts
+(500 characters each, the last 200), the directory it started in, the last
+directory and branch, the last reply, and the context size of the last
+main-chain message.
+
+Search runs on the server, so the prompt text never reaches the page. The
+query is split on whitespace (including full-width spaces) and every word
+must appear, case-insensitively, in the title, a prompt, the `/rename`
+name, the repository, worktree, branch, directory, or a linked PR's URL,
+`#number`, or title. PR titles come from the GitHub cache only.
+
+The headline is the `ai-title`, or the repository and the first prompt.
+`/rename` names are shown beside it, not as the headline: Claude Code
+rewrites them throughout the log and carries them over across `/clear`,
+so two different conversations can share one.
+
+### Resume and Hand off
+
+Resume opens a new workspace in the directory the session started in and
+runs `claude --resume <id>`. The log lives in that directory's project
+folder, so it works even when the session later moved into a worktree.
+The server refuses a session that is running (any live process with that
+id in `~/.claude/sessions`, which a resumed session keeps), one it opened
+in the last 30 seconds, and one whose directory is gone.
+
+Hand off opens a new session in the last directory (or the starting one if
+that is gone) with a short brief: title, branch, PRs, first and last
+prompts, last reply, and the log path. Like Improve Claude, the brief goes
+to `~/.cache/cc-dashboard/handoff/<random>.md` and the shell only gets the
+fixed `claude "$(cat ...)"` command. The brief asks Claude to wait for
+instructions and read only the parts of the log it needs.
+
+Resuming after the prompt cache has expired (an hour at most) writes the
+whole history to the cache again on the first turn. For a quick follow-up
+on a long session, Hand off is cheaper. Both views show the context size
+so you can choose.
 
 ## Last 7 days and PRs
 
@@ -347,11 +390,15 @@ sessions, so it is locked down:
   `127.0.0.1:<port>` or `localhost:<port>`, which blocks DNS rebinding.
 - It sends no CORS headers. The CSP allows no outside connections except
   Google Fonts.
-- `POST /api/focus`, `/api/memo`, `/api/exit`, and `/api/improve` require
+- `POST /api/focus`, `/api/memo`, `/api/exit`, `/api/improve`, `/api/resume`, and `/api/handoff` require
   JSON and an `X-CC-Dashboard: 1` header, so a plain cross-site form cannot
   reach them.
-- Improve Claude requests go to a file, never into a command line. The
-  directory and log path come from the server, not the page.
+- Improve Claude requests and Hand off briefs go to a file, never into a
+  command line. The directory and log path come from the server, not the
+  page. Resume puts only a validated session UUID in its command, and
+  workspace names go to cmux as `execFile` arguments.
+- Resume refuses a running session, and one it opened in the last 30
+  seconds, so two processes never write to one log.
 - cmux only receives tab UUIDs that exist in the current tab list, passed
   through `execFile`.
 - From `ps eww`, only `CMUX_SURFACE_ID` is kept. Other environment
@@ -363,7 +410,8 @@ sessions, so it is locked down:
   Enter, and nothing is sent while it is waiting on a prompt. A small
   window remains between the last check and the key press.
 - Values taken from conversation logs are embedded in the Improve Claude
-  prompt as single lines and marked as data, not instructions.
+  prompt and the Hand off brief as single lines and marked as data, not
+  instructions.
 - PR links from conversation logs are kept only if they look like
   `https://github.com/<owner>/<repo>/pull/<n>`.
 - `~/.cache/cc-dashboard/github.json` (PR titles and file paths, including
