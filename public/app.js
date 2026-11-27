@@ -1056,20 +1056,22 @@ function playLiveEntrance() {
 }
 
 /* ------------------------------------------------------------
-   Views: #live / #insights
+   Views: #live / #insights / #prs / #ended
    ------------------------------------------------------------ */
 function route() {
-  const view = location.hash === '#insights' ? 'insights' : location.hash === '#prs' ? 'prs' : 'live';
+  const view = { '#insights': 'insights', '#prs': 'prs', '#ended': 'ended' }[location.hash] ?? 'live';
   els.board.hidden = view !== 'live';
   document.getElementById('insights').hidden = view !== 'insights';
   document.getElementById('prs').hidden = view !== 'prs';
-  for (const v of ['live', 'insights', 'prs']) {
+  document.getElementById('ended').hidden = view !== 'ended';
+  for (const v of ['live', 'insights', 'prs', 'ended']) {
     const a = document.getElementById(`nav-${v}`);
     if (v === view) a.setAttribute('aria-current', 'page');
     else a.removeAttribute('aria-current');
   }
   if (view === 'insights') window.Insights?.show();
   if (view === 'prs') window.PRs?.show();
+  if (view === 'ended') window.Ended?.show();
   if (view === 'live' && !firstRender) playLiveEntrance();
 }
 window.addEventListener('hashchange', route);

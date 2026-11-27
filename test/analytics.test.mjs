@@ -60,3 +60,8 @@ test('subagent files do not collect prompt texts', () => {
   assert.deepEqual(st.promptTexts, []);
   assert.equal(st.startCwd, null);
 });
+
+test('keeps the last /rename name', () => {
+  const st = feed([JSON.stringify({ type: 'custom-title', customTitle: 'Old' }), user(0, 'a'), JSON.stringify({ type: 'custom-title', customTitle: 'Mine' })]);
+  assert.equal(st.customTitle, 'Mine');
+});

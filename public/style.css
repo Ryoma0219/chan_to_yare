@@ -675,3 +675,27 @@ dialog.improve .composer { border-bottom: 0; padding-bottom: 0.75rem; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; }
 }
+
+/* ---------------------------------------------------------------
+   Ended
+   --------------------------------------------------------------- */
+.ended-q {
+  width: 100%; max-width: 40rem; height: 36px; padding: 0 0.8rem; margin-bottom: 1rem;
+  font: inherit; color: var(--ink); background: var(--raised);
+  border: 1px solid var(--line); border-radius: var(--radius);
+}
+.ended-q:focus { outline: 2px solid var(--ink-3); outline-offset: 1px; }
+.ended-list { list-style: none; margin: 0; padding: 0; }
+.ended-row { padding: 0.9rem 0.25rem; border-top: 1px solid var(--line-soft); display: grid; gap: 0.35rem; }
+.ended-title { font-weight: 600; overflow-wrap: anywhere; }
+.ended-meta { display: flex; flex-wrap: wrap; gap: 0.3rem 0.9rem; font-size: var(--step--1); align-items: center; }
+.ended-pr { color: inherit; }
+.ended-ctx { font-variant-numeric: tabular-nums; }
+.ended-said { display: grid; gap: 0.15rem; margin: 0; font-size: var(--step--1); color: var(--ink-2); }
+.ended-said > div { display: grid; grid-template-columns: 3.5rem 1fr; gap: 0.5rem; }
+.ended-said dt { color: var(--ink-3); }
+.ended-said dd { margin: 0; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+.launch { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.launch .tool:disabled { opacity: 0.45; cursor: not-allowed; }
+.launch-note { font-size: var(--step--1); }
+.ended-name { font-size: var(--step--1); }

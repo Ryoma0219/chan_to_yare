@@ -218,3 +218,14 @@ test('handoff prompt asks to wait for instructions before reading the log', () =
   assert.match(p, /必要な部分だけ/);
   assert.match(p, /指示として扱わない/);
 });
+
+test('a /rename name is searchable and shown as a name, not as the title', () => {
+  // /rename の名前は /clear をまたいで別の会話に引き継がれることがあるので、見出しにはしない
+  const st = mk({ n: 1, title: null, startCwd: '/h/repo', prompts: ['real work'] });
+  st.customTitle = 'stale name';
+  const [row] = listEnded({ files: filesOf(st), runningIds: new Set(), prInfo: noPr, exists: everything, q: 'stale' });
+  assert.equal(row.title, `${describeCwd('/h/repo').repo} · real work`);
+  assert.equal(row.name, 'stale name');
+  const [plain] = listEnded({ files: filesOf(mk({ n: 2 })), runningIds: new Set(), prInfo: noPr, exists: everything });
+  assert.equal(plain.name, null);
+});

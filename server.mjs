@@ -38,6 +38,7 @@ const STATIC = {
   '/chime.js': ['chime.js', 'text/javascript; charset=utf-8'],
   '/insights.js': ['insights.js', 'text/javascript; charset=utf-8'],
   '/prs.js': ['prs.js', 'text/javascript; charset=utf-8'],
+  '/ended.js': ['ended.js', 'text/javascript; charset=utf-8'],
   '/favicon.svg': ['favicon.svg', 'image/svg+xml'],
   '/future.css': ['future.css', 'text/css; charset=utf-8'],
   '/themes.css': ['themes.css', 'text/css; charset=utf-8'],
