@@ -190,12 +190,15 @@ so two different conversations can share one.
 
 ### Resume and Hand off
 
-Resume opens a new workspace in the directory the session started in and
-runs `claude --resume <id>`. The log lives in that directory's project
-folder, so it works even when the session later moved into a worktree.
+Resume opens a new workspace and runs `claude --resume <id>` in the
+directory whose project folder holds the log (the start or the last
+directory, whichever matches `~/.claude/projects/<dir>`; the start one if
+neither does). `claude --resume` looks the log up from there, so this
+works even when the session moved into a worktree.
 The server refuses a session that is running (any live process with that
 id in `~/.claude/sessions`, which a resumed session keeps), one it opened
-in the last 30 seconds, and one whose directory is gone.
+in the last 30 seconds (reserved before calling cmux, and kept even if
+cmux times out), and one whose directory is gone.
 
 Hand off opens a new session in the last directory (or the starting one if
 that is gone) with a short brief: title, branch, PRs, first and last
