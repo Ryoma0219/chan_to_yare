@@ -30,11 +30,12 @@ dependencies.
 
 ```sh
 node server.mjs   # http://127.0.0.1:7878, override the port with PORT=7979
+npm run open      # opens it in the browser with the token (PORT=7979 npm run open)
 ```
 
 Changes under `public/` show up on reload. Changes to `server.mjs` or
 `lib/` need a server restart. Run `node --check <file>` after editing
-JavaScript, and `npm test` after changing `lib/improve.mjs`.
+JavaScript, and `npm test` after changing `server.mjs` or `lib/`.
 
 To try a change without touching the dashboard that launchd keeps running,
 start a second server on another port (`PORT=7979 node server.mjs`). It
@@ -268,7 +269,9 @@ The app is one Swift file built with `swiftc`. There is no Xcode project.
 ./macos/build.sh --open   # rebuild and open
 ```
 
-It opens `http://127.0.0.1:7878/` in a WKWebView and talks to the page
+It reads the token from `~/.config/cc-dashboard/token`, passes it to the
+page as `window.__ccdToken`, opens `http://127.0.0.1:7878/` in a
+WKWebView, and talks to the page
 through a `ccd` script message handler. The page only takes this path
 when `window.webkit.messageHandlers.ccd` exists, so the browser behaves as
 before.
@@ -316,8 +319,30 @@ Server logs go to `~/Library/Logs/cc-dashboard.log`.
 
 ## Security
 
-The server returns conversation content, so it is locked down:
+The server returns conversation content and can type into running
+sessions, so it is locked down:
 
+- Every `/api/` route needs a token. Binding to `127.0.0.1` keeps other
+  machines out, but not other macOS accounts, containers, or sandboxed
+  commands that can reach loopback and set any header they like.
+  - The token lives in `~/.config/cc-dashboard/token` (file `0600`,
+    directory `0700`). The server creates it on first start and keeps it
+    across restarts.
+  - Requests send it as `X-CC-Token`. `EventSource` cannot set headers,
+    so `/api/events` alone also accepts `?t=<token>`.
+  - `npm run open` opens `/#t=<token>`. The fragment never reaches the
+    server; `public/auth.js` moves it into `localStorage` and removes it
+    from the address bar. The URL goes to `osascript` on stdin, so the
+    token never shows up in `ps`.
+  - The macOS app injects it as `window.__ccdToken`.
+  - There is no cookie on purpose. Cookies ignore ports, so any server
+    on another `127.0.0.1` port, which another account or a container
+    can start, would receive it. `localStorage` is per port.
+  - The token is never put in the page or in an API response, since an
+    unauthenticated caller could read it from there.
+  - Without a valid token the page moves to `/locked`. The page and the
+    static code and assets stay open; the app's health check uses
+    `/favicon.svg`.
 - It binds to `127.0.0.1` only and rejects any `Host` header other than
   `127.0.0.1:<port>` or `localhost:<port>`, which blocks DNS rebinding.
 - It sends no CORS headers. The CSP allows no outside connections except
@@ -331,3 +356,16 @@ The server returns conversation content, so it is locked down:
   through `execFile`.
 - From `ps eww`, only `CMUX_SURFACE_ID` is kept. Other environment
   variables are never stored or served.
+- A request handler that throws returns 500 instead of taking the process
+  down, and a path that `new URL` cannot parse (such as `//`) gets 400.
+- A note to a working session can race with a permission prompt. The
+  session's status is read again right before pasting and right before
+  Enter, and nothing is sent while it is waiting on a prompt. A small
+  window remains between the last check and the key press.
+- Values taken from conversation logs are embedded in the Improve Claude
+  prompt as single lines and marked as data, not instructions.
+- PR links from conversation logs are kept only if they look like
+  `https://github.com/<owner>/<repo>/pull/<n>`.
+- `~/.cache/cc-dashboard/github.json` (PR titles and file paths, including
+  private repositories) is written `0600` in a `0700` directory.
+- The page loads Google Fonts, so Google sees a request each time it opens.

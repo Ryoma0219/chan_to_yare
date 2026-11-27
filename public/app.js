@@ -246,6 +246,7 @@ const FAILURE = {
   'tab-not-found': 'No cmux tab found for this session',
   'session-not-found': 'The session has ended',
   'session-waiting': 'Answer the prompt in the terminal first',
+  'session-waiting-after-paste': 'A prompt appeared while sending. The note was pasted but not sent; check the terminal',
   'cmux-failed': 'Could not reach cmux',
   'session-busy': 'Claude is working. Wait for the turn to end',
   'exit-timeout': 'The session did not exit',
@@ -754,7 +755,7 @@ async function sendMemo(id, refs, mode) {
   refs.improveBtn.disabled = true;
   refs.hint.textContent = mode === 'remember' ? 'Asking it to remember…' : 'Sending…';
   try {
-    const res = await fetch('/api/memo', {
+    const res = await ccdAuth.fetch('/api/memo', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CC-Dashboard': '1' },
       body: JSON.stringify({ sessionId: id, text, mode }),
@@ -788,7 +789,7 @@ function finishSending(refs) {
    ------------------------------------------------------------ */
 async function postImprove(text, sessionId) {
   try {
-    const res = await fetch('/api/improve', {
+    const res = await ccdAuth.fetch('/api/improve', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CC-Dashboard': '1' },
       body: JSON.stringify(sessionId ? { sessionId, text } : { text }),
@@ -894,7 +895,7 @@ async function exitSession(id, refs) {
   button.classList.add('busy');
   label.textContent = 'Exiting…';
   try {
-    const res = await fetch('/api/exit', {
+    const res = await ccdAuth.fetch('/api/exit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CC-Dashboard': '1' },
       body: JSON.stringify({ sessionId: id }),
@@ -925,7 +926,7 @@ async function jump(id, button) {
   button.classList.add('busy');
   const label = button.querySelector('.jump-label');
   try {
-    const res = await fetch('/api/focus', {
+    const res = await ccdAuth.fetch('/api/focus', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CC-Dashboard': '1' },
       body: JSON.stringify({ sessionId: id }),
@@ -950,7 +951,7 @@ window.ccdJump = (id) => {
   if (typeof id !== 'string') return;
   const row = rows.get(id);
   if (row && !row.refs.jump.disabled) return jump(id, row.refs.jump);
-  return fetch('/api/focus', {
+  return ccdAuth.fetch('/api/focus', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-CC-Dashboard': '1' },
     body: JSON.stringify({ sessionId: id }),
@@ -1024,7 +1025,7 @@ function setLink(ok) {
 }
 
 function connect() {
-  const es = new EventSource('/api/events');
+  const es = new EventSource(ccdAuth.eventsURL());
   es.onopen = () => setLink(true);
   es.onmessage = (ev) => {
     try {
@@ -1039,7 +1040,11 @@ function connect() {
     brand.classList.add('beat');
     render();
   };
-  es.onerror = () => setLink(false);
+  es.onerror = () => {
+    setLink(false);
+    // EventSource からは 401 が見えない。トークンが古くなっていればロック画面へ移る
+    ccdAuth.fetch('/api/state').catch(() => {});
+  };
 }
 
 function playLiveEntrance() {

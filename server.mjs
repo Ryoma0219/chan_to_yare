@@ -6,6 +6,7 @@
 //
 // 会話ログの中身を返すサーバーなので、127.0.0.1 にだけ bind し、
 // Host ヘッダーも検査する (DNS リバインディング対策)。CORS ヘッダーは返さない。
+// API はトークンを知っている人にだけ開く (lib/auth.mjs)。
 
 import http from 'node:http';
 import fs from 'node:fs';
@@ -16,6 +17,7 @@ import { Analytics } from './lib/analytics.mjs';
 import { GitHub } from './lib/github.mjs';
 import { computePRs } from './lib/prs.mjs';
 import { sanitizeImprove, launchImprove } from './lib/improve.mjs';
+import { loadToken, isAuthorized } from './lib/auth.mjs';
 import { execFile } from 'node:child_process';
 
 const HOST = '127.0.0.1';
@@ -24,9 +26,12 @@ const POLL_MS = 1500;
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(ROOT, 'public');
 const ALLOWED_HOSTS = new Set([`127.0.0.1:${PORT}`, `localhost:${PORT}`]);
+const TOKEN = loadToken();
 
+// コードと素材だけなので、認証なしで返す。データはすべて /api/ から取る
 const STATIC = {
   '/': ['index.html', 'text/html; charset=utf-8'],
+  '/auth.js': ['auth.js', 'text/javascript; charset=utf-8'],
   '/app.js': ['app.js', 'text/javascript; charset=utf-8'],
   '/style.css': ['style.css', 'text/css; charset=utf-8'],
   '/chime.js': ['chime.js', 'text/javascript; charset=utf-8'],
@@ -141,9 +146,30 @@ function readBody(req, limit = 4096) {
   });
 }
 
-const server = http.createServer(async (req, res) => {
+const LOCKED_PAGE = `<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Chan to Yare</title>
+<h1>Chan to Yare is locked</h1>
+<p>Open the dashboard with <code>npm run open</code> in the cc-dashboard folder.</p>
+<p>In the Chan to Yare app, this page goes away once the server has created its token.</p>
+`;
+
+async function handle(req, res) {
   if (!ALLOWED_HOSTS.has(req.headers.host ?? '')) return send(res, 421, 'misdirected');
-  const url = new URL(req.url, `http://${req.headers.host}`);
+  let url;
+  try {
+    // "//" のようなパスは new URL が例外を投げる。逃がすとプロセスごと落ちる
+    url = new URL(req.url, `http://${req.headers.host}`);
+  } catch {
+    return send(res, 400, 'bad request');
+  }
+
+  // トークンがない・古いときに public/auth.js が移ってくる画面
+  if (req.method === 'GET' && url.pathname === '/locked') {
+    return send(res, 200, LOCKED_PAGE, { 'Content-Type': 'text/html; charset=utf-8' });
+  }
+  if (url.pathname.startsWith('/api/') && !isAuthorized(req, url, TOKEN)) return send(res, 401, 'unauthorized');
 
   if (req.method === 'GET' && STATIC[url.pathname]) {
     const [file, type] = STATIC[url.pathname];
@@ -250,9 +276,18 @@ const server = http.createServer(async (req, res) => {
   }
 
   send(res, 404, 'not found');
+}
+
+const server = http.createServer((req, res) => {
+  handle(req, res).catch((e) => {
+    // ハンドラの例外でサーバーを落とさない (待ち中の Exit やほかの画面を巻き添えにしない)
+    console.error('[request]', req.method, e);
+    if (!res.headersSent) send(res, 500, 'internal error');
+    else res.destroy();
+  });
 });
 
 server.listen(PORT, HOST, () => {
-  console.log(`cc-dashboard: http://${HOST}:${PORT}`);
+  console.log(`cc-dashboard: http://${HOST}:${PORT} (open it with: npm run open)`);
   tick();
 });
