@@ -162,11 +162,21 @@ test('a second Resume within 30 seconds is refused', async () => {
   assert.equal(calls.length, 2);
 });
 
-test('a failed Resume does not block the next try', async () => {
+test('a Resume that cmux did not confirm still blocks retries for 30 seconds', async () => {
+  // cmux がタイムアウトしても、ワークスペースは開いていることがある
   const st = mk({ n: 1 });
   const recent = new Map();
-  assert.deepEqual(await launchResume({ st, running: false, recent, run: recorder(null).run, exists: everything }), { ok: false, reason: 'cmux-failed' });
-  assert.deepEqual(await launchResume({ st, running: false, recent, run: recorder().run, exists: everything }), { ok: true });
+  const t0 = 1_000_000;
+  assert.deepEqual(await launchResume({ st, running: false, recent, run: recorder(null).run, exists: everything, now: t0 }), { ok: false, reason: 'cmux-failed' });
+  assert.deepEqual(await launchResume({ st, running: false, recent, run: recorder().run, exists: everything, now: t0 + 1000 }), { ok: false, reason: 'session-running' });
+  assert.deepEqual(await launchResume({ st, running: false, recent, run: recorder().run, exists: everything, now: t0 + RECENT_MS + 1 }), { ok: true });
+});
+
+test('a Resume refused for a missing folder does not reserve the session', async () => {
+  const st = mk({ n: 1 });
+  const recent = new Map();
+  assert.equal((await launchResume({ st, running: false, recent, run: recorder().run, exists: () => false })).reason, 'cwd-missing');
+  assert.equal(recent.size, 0);
 });
 
 test('launchResume refuses when the start cwd is gone', async () => {
@@ -228,4 +238,38 @@ test('a /rename name is searchable and shown as a name, not as the title', () =>
   assert.equal(row.name, 'stale name');
   const [plain] = listEnded({ files: filesOf(mk({ n: 2 })), runningIds: new Set(), prInfo: noPr, exists: everything });
   assert.equal(plain.name, null);
+});
+
+/* ---------- final review fixes ---------- */
+
+test('two Resume requests at the same time launch once', async () => {
+  const st = mk({ n: 1 });
+  const recent = new Map();
+  let calls = 0;
+  const run = async () => {
+    calls++;
+    await new Promise((r) => setTimeout(r, 50));
+    return '';
+  };
+  const res = await Promise.all([1, 2].map(() => launchResume({ st, running: false, recent, run, exists: everything })));
+  assert.deepEqual(res.map((r) => r.ok).sort(), [false, true]);
+  assert.equal(calls, 1);
+});
+
+test('Resume starts in the folder whose project directory holds the log', async () => {
+  // ログは /h/repo/.claude/worktrees/w のプロジェクトフォルダにあるのに、最初に見えた cwd は /h/repo
+  const st = mk({ n: 1, startCwd: '/h/repo', cwd: '/h/repo/.claude/worktrees/w' });
+  st.file = `/p/-h-repo--claude-worktrees-w/${ID(1)}.jsonl`;
+  const { calls, run } = recorder();
+  await launchResume({ st, running: false, recent: new Map(), run, exists: everything });
+  assert.equal(flag(calls[0].args, '--cwd'), '/h/repo/.claude/worktrees/w');
+  const [row] = listEnded({ files: filesOf(st), runningIds: new Set(), prInfo: noPr, exists: (p) => p === '/h/repo' });
+  assert.equal(row.resumable, false);
+});
+
+test('full-width letters and digits match their half-width forms', () => {
+  const url = 'https://github.com/o/r/pull/123';
+  const files = filesOf(mk({ n: 1, prs: [url], prompts: ['Fix PR review'] }), mk({ n: 2 }));
+  assert.deepEqual(ids(listEnded({ files, runningIds: new Set(), prInfo: noPr, exists: everything, q: '＃１２３' })), [ID(1)]);
+  assert.deepEqual(ids(listEnded({ files, runningIds: new Set(), prInfo: noPr, exists: everything, q: 'ＰＲ' })), [ID(1)]);
 });

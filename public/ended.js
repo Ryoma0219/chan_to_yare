@@ -16,7 +16,7 @@ window.Ended = (() => {
     'session-running': 'This session is already running.',
     'cwd-missing': 'Its folder is gone.',
     'session-not-found': 'It is no longer in the last 31 days of logs.',
-    'cmux-failed': 'cmux did not respond.',
+    'cmux-failed': 'cmux did not respond. If no workspace opened, try again in 30 seconds.',
     'launch-failed': 'cmux did not respond.',
   };
   const reasonText = (reason) => REASONS[reason] ?? REASONS['cmux-failed'];
