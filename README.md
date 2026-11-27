@@ -39,8 +39,6 @@ The name is Japanese for "do it properly."
 
 ## Features
 
-The screenshots use dummy data.
-
 ### Live
 
 ![The Live view with sessions waiting on you and sessions Claude is working on](assets/screenshots/live.png)
