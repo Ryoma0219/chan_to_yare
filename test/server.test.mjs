@@ -122,3 +122,32 @@ test('the query token works for /api/events only', async () => {
 test('the locked page is open', async () => {
   assert.equal((await fetch(`${BASE}/locked`)).status, 200);
 });
+
+test('the new routes are closed without the token', async () => {
+  assert.equal((await fetch(`${BASE}/api/ended`)).status, 401);
+  for (const p of ['/api/resume', '/api/handoff']) {
+    assert.equal((await post(p, '{"sessionId":"x"}', {})).status, 401, p);
+    assert.equal((await post(p, '{"sessionId":"x"}', { 'X-CC-Token': '0'.repeat(64) })).status, 401, p);
+  }
+});
+
+test('resume and handoff reject a bad session id', async () => {
+  for (const p of ['/api/resume', '/api/handoff']) {
+    for (const body of ['{"sessionId":"x"}', '{}', 'null']) assert.equal((await post(p, body)).status, 400, `${p} ${body}`);
+  }
+  await alive();
+});
+
+test('resume and handoff of an unknown session are refused', async () => {
+  for (const p of ['/api/resume', '/api/handoff']) {
+    const res = await post(p, JSON.stringify({ sessionId: crypto.randomUUID() }));
+    assert.equal(res.status, 409, p);
+    assert.equal((await res.json()).reason, 'session-not-found');
+  }
+});
+
+test('ended returns a list', async () => {
+  const res = await fetch(`${BASE}/api/ended?q=zzzz-no-such-word-${Date.now()}`, { headers: { 'X-CC-Token': token } });
+  assert.equal(res.status, 200);
+  assert.deepEqual(await res.json(), { sessions: [] });
+});

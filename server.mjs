@@ -17,6 +17,7 @@ import { Analytics } from './lib/analytics.mjs';
 import { GitHub } from './lib/github.mjs';
 import { computePRs } from './lib/prs.mjs';
 import { sanitizeImprove, launchImprove } from './lib/improve.mjs';
+import { listEnded, findSession, launchResume, launchHandoff } from './lib/ended.mjs';
 import { loadToken, isAuthorized } from './lib/auth.mjs';
 import { execFile } from 'node:child_process';
 
@@ -37,6 +38,7 @@ const STATIC = {
   '/chime.js': ['chime.js', 'text/javascript; charset=utf-8'],
   '/insights.js': ['insights.js', 'text/javascript; charset=utf-8'],
   '/prs.js': ['prs.js', 'text/javascript; charset=utf-8'],
+  '/ended.js': ['ended.js', 'text/javascript; charset=utf-8'],
   '/favicon.svg': ['favicon.svg', 'image/svg+xml'],
   '/future.css': ['future.css', 'text/css; charset=utf-8'],
   '/themes.css': ['themes.css', 'text/css; charset=utf-8'],
@@ -54,7 +56,7 @@ const SECURITY_HEADERS = {
 };
 
 // 同一オリジン・独自ヘッダー・JSON の検査をかける書き込み系
-const POST_ROUTES = new Set(['/api/focus', '/api/memo', '/api/exit', '/api/improve']);
+const POST_ROUTES = new Set(['/api/focus', '/api/memo', '/api/exit', '/api/improve', '/api/resume', '/api/handoff']);
 
 function runCmux(cmd, args) {
   return new Promise((resolve) => {
@@ -66,7 +68,8 @@ const collector = new Collector();
 const analytics = new Analytics();
 const github = new GitHub();
 const PR_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
-let prCache = null; // { at, body }
+let prCache = null; // { at, result }
+const recentLaunches = new Map(); // sessionId -> Resume で立ち上げた時刻 (二度押し対策)
 let prBuilding = null;
 
 // 会話ログに出てくる PR の URL から、対象にする GitHub の owner を決める
@@ -91,8 +94,15 @@ async function buildPRs() {
     patchOf: (u) => github.patchOf(u),
   });
   result.error = gh.error ?? null;
-  prCache = { at: Date.now(), body: JSON.stringify(result) };
-  return prCache.body;
+  prCache = { at: Date.now(), result };
+  return result;
+}
+
+// セッションが動いているかは返すたびに付け直す (PR の集計は 60 秒キャッシュする)
+function prsBody(result) {
+  const running = collector.runningIds();
+  for (const p of result.prs ?? []) for (const s of p.sessions ?? []) s.running = running.has(s.id);
+  return JSON.stringify(result);
 }
 let latest = null;
 let latestJson = '';
@@ -217,11 +227,22 @@ async function handle(req, res) {
     try {
       const fresh = prCache && Date.now() - prCache.at < 60000;
       if (!fresh && !prBuilding) prBuilding = buildPRs().finally(() => (prBuilding = null));
-      const body = prCache ? prCache.body : await prBuilding;
-      return send(res, 200, body, { 'Content-Type': 'application/json' });
+      const result = prCache ? prCache.result : await prBuilding;
+      return send(res, 200, prsBody(result), { 'Content-Type': 'application/json' });
     } catch (e) {
       console.error('[prs]', e);
       return send(res, 500, JSON.stringify({ error: 'prs-failed' }), { 'Content-Type': 'application/json' });
+    }
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/ended') {
+    try {
+      const files = await analytics.files30();
+      const sessions = listEnded({ files, runningIds: collector.runningIds(), prInfo: (u) => github.prInfo(u), q: url.searchParams.get('q') ?? '' });
+      return send(res, 200, JSON.stringify({ sessions }), { 'Content-Type': 'application/json' });
+    } catch (e) {
+      console.error('[ended]', e);
+      return send(res, 500, JSON.stringify({ error: 'ended-failed' }), { 'Content-Type': 'application/json' });
     }
   }
 
@@ -249,6 +270,18 @@ async function handle(req, res) {
       result = await collector.focus(sessionId);
     } else if (url.pathname === '/api/exit') {
       result = await collector.exitSession(sessionId);
+    } else if (url.pathname === '/api/resume' || url.pathname === '/api/handoff') {
+      // 立ち上げ先と会話ログのパスはサーバーが sessionId から引く。body の他の値は使わない
+      try {
+        const st = findSession(await analytics.files30(), sessionId);
+        result =
+          url.pathname === '/api/resume'
+            ? await launchResume({ st, running: collector.runningIds().has(sessionId), recent: recentLaunches, run: runCmux })
+            : await launchHandoff({ st, transcript: st?.file ?? null, prInfo: (u) => github.prInfo(u), run: runCmux });
+      } catch (e) {
+        console.error('[launch]', e);
+        result = { ok: false, reason: 'launch-failed' };
+      }
     } else if (url.pathname === '/api/improve') {
       const text = typeof body.text === 'string' ? sanitizeImprove(body.text) : '';
       if (!text) return send(res, 400, 'bad request');

@@ -16,6 +16,7 @@
 <script src="/app.js" defer></script>
 <script src="/insights.js" defer></script>
 <script src="/prs.js" defer></script>
+<script src="/ended.js" defer></script>
 </head>
 <body>
 <svg class="sprite" aria-hidden="true">
@@ -39,6 +40,7 @@
     <a href="#live" id="nav-live" aria-current="page">Live</a>
     <a href="#insights" id="nav-insights">Last 7 days</a>
     <a href="#prs" id="nav-prs">PRs</a>
+    <a href="#ended" id="nav-ended">Ended</a>
   </nav>
   <p class="tally" id="tally" aria-live="polite"></p>
   <div class="bar-tools">
@@ -189,6 +191,17 @@
     <p class="panel-note">Click a column to sort. Click a row to see its sessions, reviews and rework.</p>
     <div class="table-wrap"><table class="pr-table" id="pr-table"></table></div>
   </section>
+</main>
+
+<main id="ended" class="insights ended-view" hidden aria-busy="true">
+  <div class="ins-head">
+    <h2>Ended sessions</h2>
+    <p class="ins-range">Last 31 days, newest first</p>
+  </div>
+  <p class="panel-note">Search titles, everything you asked, repositories, branches and PRs (<code>#123</code>). Resume continues the conversation but re-reads its whole context once the cache has expired. Hand off starts a fresh session with a short summary and a pointer to the log, which is cheaper for a quick follow-up.</p>
+  <input class="ended-q" id="ended-q" type="search" placeholder="auth token, #123, repo name…" aria-label="Search ended sessions" autocomplete="off">
+  <p class="ins-status" id="ended-status" role="status">Reading 31 days of session logs…</p>
+  <ol class="ended-list" id="ended-list"></ol>
 </main>
 
 <div class="tip" id="tip" role="tooltip" hidden></div>

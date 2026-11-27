@@ -234,7 +234,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     // WKWebView 自身も reload(_:) を持つので、別名にしてターゲットを明示する (エラー画面からの再接続のため)
     view.addItem(withTitle: "Reload", action: #selector(reloadDashboard(_:)), keyEquivalent: "r").target = self
     view.addItem(.separator())
-    for (i, (title, hash)) in [("Live", "#live"), ("Last 7 days", "#insights"), ("PRs", "#prs")].enumerated() {
+    for (i, (title, hash)) in [("Live", "#live"), ("Last 7 days", "#insights"), ("PRs", "#prs"), ("Ended", "#ended")].enumerated() {
       let item = view.addItem(withTitle: title, action: #selector(showView(_:)), keyEquivalent: "\(i + 1)")
       item.target = self
       item.representedObject = hash

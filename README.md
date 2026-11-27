@@ -65,6 +65,14 @@ The name is Japanese for "do it properly."
 - A size and cost plot that marks PRs rewritten within 21 days or reverted.
 - Open a row to see its sessions, reviews, and the PRs that rewrote its lines.
 
+### Ended
+
+- Every session from the last 31 days that is no longer running, newest first.
+- Search what you asked, titles, repositories, branches and PRs (`#123`), with Japanese and full-width spaces.
+- Resume continues the conversation in a new cmux workspace. Hand off starts a fresh session with a short brief and a pointer to the log.
+- Each session shows its context size. Resuming after the prompt cache has expired re-reads all of it, so Hand off is cheaper for a quick follow-up.
+- The same Resume and Hand off buttons sit next to each session in the PRs view.
+
 ## Install
 
 You need macOS, Node 20 or later, [cmux](https://github.com/manaflow-ai/cmux), and Claude Code.
@@ -100,6 +108,7 @@ See [HACKING.md](HACKING.md) for details.
 | Live        | Every running session, grouped into your turn, Claude's turn, and untouched for 12+ hours                 |
 | Last 7 days | When Claude worked and waited on you, how fast you reply, cost, repositories, tools, skills and approvals |
 | PRs         | Each PR you opened in the last 30 days next to the sessions behind it, on four axes                       |
+| Ended       | Sessions from the last 31 days that are no longer running, searchable, with Resume and Hand off           |
 
 From the Live view you can open a session's cmux tab, read its last
 exchange, and send it a note ("Send" or "Remember") without leaving the
@@ -109,7 +118,7 @@ note box, opens a new session that changes how Claude behaves: its
 CLAUDE.md, skills, hooks, settings, or memory. When a session starts waiting on you, the app plays a sound once,
 posts a macOS notification, and updates the Dock badge.
 
-In the app, `⌘1` `⌘2` `⌘3` switch views and `⌘R` reloads.
+In the app, `⌘1` `⌘2` `⌘3` `⌘4` switch views and `⌘R` reloads.
 
 ## Developing
 
