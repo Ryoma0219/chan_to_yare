@@ -52,7 +52,8 @@ test('command never contains user text', async () => {
   assert.deepEqual(result, { ok: true });
   assert.equal(calls.length, 1);
   const command = flag(calls[0].args, '--command');
-  assert.match(command, /^claude "\$\(cat '[^']+\.md'\)"$/);
+  // 先頭の空白は ~/.zsh/cmux-claude-resume.zsh のカウントダウンに 1 キー目を食わせるため
+  assert.match(command, /^ claude "\$\(cat '[^']+\.md'\)"$/);
   for (const part of ["it's", '$(rm', '`x`', 'next']) assert.ok(!command.includes(part), part);
   const file = command.match(/cat '([^']+)'/)[1];
   assert.equal(path.dirname(file), dir);
