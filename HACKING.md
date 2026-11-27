@@ -12,8 +12,9 @@ dependencies.
 | Path                     | Role                                                                                          |
 | ------------------------ | --------------------------------------------------------------------------------------------- |
 | `server.mjs`             | HTTP server, SSE stream, and the API (`state`, `events`, `insights`, `prs`, `ended`, `focus`, `memo`, `exit`, `improve`, `resume`, `handoff`) |
-| `lib/collect.mjs`        | Finds running sessions, decides their state, maps them to cmux tabs, jumps tabs, sends notes, ends sessions |
-| `lib/improve.mjs`        | Writes an Improve Claude request to a file and opens a new cmux workspace that runs it        |
+| `lib/collect.mjs`        | Finds running sessions, decides their state, maps them to terminal tabs, jumps tabs, sends notes, ends sessions |
+| `lib/terminals/`         | One file per terminal (`cmux.mjs`, `tmux.mjs`) and `index.mjs`, which detects them and picks where to open new sessions |
+| `lib/improve.mjs`        | Writes an Improve Claude request to a file and opens a new tab that runs it                   |
 | `lib/ended.mjs`          | Lists and searches ended sessions, and opens them again with Resume or Hand off               |
 | `lib/transcript.mjs`     | Reads one conversation log incrementally and keeps its title, last exchange, and turns        |
 | `lib/analytics.mjs`      | Reads 31 days of conversation logs incrementally and builds the Last 7 days view              |
@@ -40,15 +41,18 @@ JavaScript, and `npm test` after changing `server.mjs` or `lib/`.
 
 To try a change without touching the dashboard that launchd keeps running,
 start a second server on another port (`PORT=7979 node server.mjs`). It
-still talks to the real cmux. Do not close tabs or workspaces through the
+still talks to the real cmux and tmux. Do not close tabs or workspaces through the
 cmux CLI while testing: on 2026-11-27 a `close-workspace` followed by a
 `tree` query crashed cmux, and every running session went with it.
+
+`test/terminals.test.mjs` starts its own tmux server on a private socket
+in a temporary folder and kills it afterwards. It never touches your tmux.
 
 ### Screenshots
 
 The README screenshots come from `demo/server.mjs`, which serves `public/`
 with the dummy data in `demo/fixtures.mjs`. It reads no logs and calls
-neither cmux nor GitHub. All times are relative to the moment of the
+no terminal and no GitHub. All times are relative to the moment of the
 request.
 
 ```sh
@@ -72,16 +76,66 @@ only show their attention state in a browser. They were then scaled to 1600 px w
 | ---------------------------------------- | -------------------------------------------------------------------------------------------- |
 | `~/.claude/sessions/<pid>.json`          | Session state written by Claude Code itself: `busy`, `shell`, `idle`, or `waiting`           |
 | `~/.claude/projects/*/<sessionId>.jsonl` | Conversation logs: title, prompts and replies, turn timing, token usage, tools, PR links     |
-| `ps eww`                                 | Only `CMUX_SURFACE_ID` from each process, to know which cmux tab a session lives in          |
-| `cmux tree --json`                       | Tab and workspace names                                                                      |
+| `ps eww`                                 | Only the terminal markers below from each process, to know which tab a session lives in     |
+| `cmux tree --json`, `tmux list-panes`    | Tab and workspace names                                                                      |
 | `gh`                                     | Your pull requests: size, files, reviews, diffs, and reverts                                 |
 
-Chan to Yare writes in four ways: it focuses a cmux tab
-(`select-workspace` and `focus-panel`), it sends a note to a session
-(`set-buffer`, `paste-buffer`, `send-key enter`), it ends a session by
-sending `/exit` the same way, and it opens a new workspace
-(`new-workspace`) for Improve Claude, Resume, and Hand off. It never
-closes tabs or workspaces.
+Chan to Yare writes in four ways: it focuses a session's tab, it sends a
+note to a session (paste, then Enter), it ends a session by sending
+`/exit` the same way, and it opens a new tab for Improve Claude, Resume,
+and Hand off. It never closes tabs, windows, or workspaces.
+
+## Terminals
+
+Each terminal is a module in `lib/terminals/` with the same shape:
+`identify(env)`, `listTabs`, `focus`, `paste`, `pressEnter`, and `launch`,
+plus `can` (which of focus, send, and launch it supports). The safety
+checks (re-reading `waiting` before the paste and before Enter, refusing
+Exit while busy) live in `lib/collect.mjs`, not in the modules, so every
+terminal gets them.
+
+| Terminal | Marker in the process environment | Focus | Note and Exit | New tab |
+| -------- | --------------------------------- | ----- | ------------- | ------- |
+| cmux     | `CMUX_SURFACE_ID`                 | `select-workspace`, `focus-panel`, `open -a cmux` | `set-buffer`, `paste-buffer`, `send-key enter` | `new-workspace --command` |
+| tmux     | `TMUX` (socket path) and `TMUX_PANE` | `select-window`, `select-pane`, `switch-client`, then the outer terminal | `set-buffer`, `paste-buffer -p` (bracketed paste), `send-keys Enter` | `new-window`, then `send-keys` types the command |
+| others   | none                              | no    | no            | no      |
+
+Sessions in other terminals still show up with their state, last
+exchange, and analytics. Their Open, Send, and Exit buttons are disabled.
+
+- When both markers are present, tmux wins. A pane's processes can carry
+  the `CMUX_SURFACE_ID` of the tab that started the tmux server, which is
+  not where the pane is shown now.
+- A tmux pane only counts when its `#{pane_tty}` is the session
+  process's tty. Apps started from a pane (an editor's terminal, for
+  example) inherit `TMUX` and `TMUX_PANE`, and without this check a note
+  would be typed into the pane they were started from.
+- Every tmux command names the server with `-S <socket>`, taken from
+  `TMUX`, so sessions on several tmux servers do not get mixed up.
+- After focusing a tmux pane, the server looks at the tmux client's
+  process. If it runs in a cmux tab, that tab is focused. Otherwise its
+  `TERM_PROGRAM` (iTerm, Terminal, Ghostty, WezTerm, VS Code) is brought to
+  the front with `open -a`.
+
+### Where new sessions open
+
+Improve Claude, Resume, and Hand off open a new tab in one terminal,
+chosen by `launcher` in `~/.config/cc-dashboard/config.json`:
+
+```json
+{ "launcher": "auto" }
+```
+
+| Value    | Opens in                                                                 |
+| -------- | ------------------------------------------------------------------------ |
+| `auto`   | The terminal with the most running sessions; cmux on a tie (the default) |
+| `cmux`   | cmux                                                                     |
+| `tmux`   | The tmux server with the most running sessions, or the default server    |
+| `none`   | Nowhere                                                                  |
+
+The file is read on every launch, so no restart is needed. When nothing
+can be opened, the page shows the command (`cd '<dir>' && claude ...`)
+with a Copy button instead.
 
 ## Live
 
@@ -120,13 +174,16 @@ tick.
 ### Sending a note
 
 `cmux send` turns `\n` in the text into Enter, which once ran test text as
-shell commands. Notes go through a named buffer instead:
+shell commands. Notes go through a named buffer instead (in tmux,
+`paste-buffer -p`), and Enter is a separate step:
 
 ```js
 if (record.status === 'waiting') return { ok: false, reason: 'session-waiting' };
-await run(CMUX_BIN, ['set-buffer', '--name', buffer, '--', text]);
-await run(CMUX_BIN, ['paste-buffer', '--name', buffer, ...ws, '--surface', surface.id]);
-await run(CMUX_BIN, ['send-key', ...ws, '--surface', surface.id, 'enter']);
+if (this.#nowWaiting(record)) return { ok: false, reason: 'session-waiting' };
+await backend.paste(this.run, tab, text);
+await new Promise((r) => setTimeout(r, 250));
+if (this.#nowWaiting(record)) return { ok: false, reason: 'session-waiting-after-paste' };
+await backend.pressEnter(this.run, tab);
 ```
 
 Newlines are folded into spaces and control characters are dropped before
@@ -143,12 +200,12 @@ WKWebView silently returns false for it.
 The server refuses `waiting` sessions for the same reason as notes, and
 `busy` or `shell` sessions because `/exit` would be queued and end the
 session when the turn finishes. After sending, it waits up to five seconds
-for the process to go away and reports `exit-timeout` otherwise. The cmux
+for the process to go away and reports `exit-timeout` otherwise. The
 tab is left open at the shell, showing `claude --resume <id>`.
 
 ### Improving Claude
 
-Improve Claude opens a new cmux workspace in which Claude Code works on a
+Improve Claude opens a new tab (see [Where new sessions open](#where-new-sessions-open)) in which Claude Code works on a
 request about its own behavior. It can be started from the header, which
 opens the session in `~/.claude`, or from a row's composer, which opens it
 in that session's directory and adds the session's title, directory, and
@@ -198,8 +255,8 @@ neither does). `claude --resume` looks the log up from there, so this
 works even when the session moved into a worktree.
 The server refuses a session that is running (any live process with that
 id in `~/.claude/sessions`, which a resumed session keeps), one it opened
-in the last 30 seconds (reserved before calling cmux, and kept even if
-cmux times out), and one whose directory is gone.
+in the last 30 seconds (reserved before calling the terminal, and kept even if
+it times out), and one whose directory is gone.
 
 Hand off opens a new session in the last directory (or the starting one if
 that is gone) with a short brief: title, branch, PRs, first and last
@@ -329,7 +386,7 @@ before.
 | Page → app | `{type: 'notify', title, body, sessionId, kind}` | Posts a macOS notification unless the app is in front           |
 | Page → app | `{type: 'sound', kind}`                         | Plays Glass for a reply or Hero for a prompt                    |
 | Page → app | `{type: 'soundEnabled', on}`                    | Remembers the sound setting                                     |
-| App → page | `window.ccdJump(sessionId)`                     | Focuses the session's cmux tab when a notification is clicked   |
+| App → page | `window.ccdJump(sessionId)`                     | Focuses the session's terminal tab when a notification is clicked |
 | App → page | `window.__ccdSound`                             | Passes the sound setting at launch                              |
 
 Messages are accepted only from the main frame at `127.0.0.1:7878`.
@@ -352,8 +409,9 @@ edit the node path, working directory, and log path.
 - Point `ProgramArguments` at the real node binary. Version manager shims
   such as nodenv do not work under launchd.
 - Keep `/opt/homebrew/bin` on `PATH` for `gh`.
-- Do not pass `CMUX_*` variables. cmux commands use them as the default
-  target, so a server started from a cmux tab would act on that tab.
+- Do not pass `CMUX_*`, `TMUX`, or `TMUX_PANE`. cmux and tmux commands use
+  them as the default target, so a server started from a cmux tab or a
+  tmux pane would act on that tab.
 
 ```sh
 launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.ryoma0219.cc-dashboard.plist
@@ -400,13 +458,19 @@ sessions, so it is locked down:
 - Improve Claude requests and Hand off briefs go to a file, never into a
   command line. The directory and log path come from the server, not the
   page. Resume puts only a validated session UUID in its command, and
-  workspace names go to cmux as `execFile` arguments.
+  tab and workspace names go to the terminal as `execFile` arguments.
 - Resume refuses a running session, and one it opened in the last 30
   seconds, so two processes never write to one log.
-- cmux only receives tab UUIDs that exist in the current tab list, passed
+- Terminals only receive tab ids that exist in the current tab list
+  (cmux surface UUIDs, tmux `%N` panes on a socket from `TMUX`), passed
   through `execFile`.
-- From `ps eww`, only `CMUX_SURFACE_ID` is kept. Other environment
-  variables are never stored or served.
+- From `ps eww`, only `CMUX_SURFACE_ID`, `TMUX`, and `TMUX_PANE` are kept,
+  plus `TERM_PROGRAM` of a tmux client process while focusing. Each value
+  is checked against a strict pattern (or, for `TERM_PROGRAM`, a fixed
+  list of apps) before use. Other environment variables are never stored
+  or served.
+- A terminal that only offers AppleScript must get values through
+  `on run argv`, never by putting them into the script text.
 - A request handler that throws returns 500 instead of taking the process
   down, and a path that `new URL` cannot parse (such as `//`) gets 400.
 - A note to a working session can race with a permission prompt. The

@@ -5,6 +5,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { sanitizeImprove, buildImprovePrompt, improveCommand, launchImprove } from '../lib/improve.mjs';
 import { isPrUrl } from '../lib/transcript.mjs';
+import cmux from '../lib/terminals/cmux.mjs';
+
+const CMUX = { backend: cmux, keys: [] };
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'ccd-improve-'));
 
@@ -49,8 +52,8 @@ test('command never contains user text', async () => {
   const dir = tmp();
   const text = "it's $(rm -rf ~) `x`\nnext";
   const { calls, run } = recorder();
-  const result = await launchImprove({ text, run, dir });
-  assert.deepEqual(result, { ok: true });
+  const result = await launchImprove({ text, run, launcher: CMUX, dir });
+  assert.deepEqual(result, { ok: true, terminal: 'cmux' });
   assert.equal(calls.length, 1);
   const command = flag(calls[0].args, '--command');
   // 先頭の空白は ~/.zsh/cmux-claude-resume.zsh のカウントダウンに 1 キー目を食わせるため
@@ -64,20 +67,31 @@ test('command never contains user text', async () => {
 
 test('cwd defaults to ~/.claude', async () => {
   const { calls, run } = recorder();
-  await launchImprove({ text: 'x', run, dir: tmp() });
+  await launchImprove({ text: 'x', run, launcher: CMUX, dir: tmp() });
   assert.equal(flag(calls[0].args, '--cwd'), path.join(os.homedir(), '.claude'));
   assert.equal(calls[0].args[0], 'new-workspace');
 });
 
 test('context comes from collector only', async () => {
   const { calls, run } = recorder();
-  await launchImprove({ text: 'x', session: { title: 'T', cwd: '/from/server', transcript: null }, run, dir: tmp() });
+  await launchImprove({ text: 'x', session: { title: 'T', cwd: '/from/server', transcript: null }, run, launcher: CMUX, dir: tmp() });
   assert.equal(flag(calls[0].args, '--cwd'), '/from/server');
 });
 
-test('cmux failure', async () => {
+test('terminal failure returns a command to run by hand', async () => {
   const { run } = recorder(null);
-  assert.deepEqual(await launchImprove({ text: 'x', run, dir: tmp() }), { ok: false, reason: 'cmux-failed' });
+  const res = await launchImprove({ text: 'x', run, launcher: CMUX, dir: tmp() });
+  assert.equal(res.ok, false);
+  assert.equal(res.reason, 'terminal-failed');
+  assert.match(res.command, /^cd '[^']+\/\.claude' && claude "\$\(cat '[^']+\.md'\)"$/);
+});
+
+test('no terminal: nothing runs and the command comes back', async () => {
+  const { calls, run } = recorder();
+  const res = await launchImprove({ text: 'x', run, launcher: null, dir: tmp() });
+  assert.equal(calls.length, 0);
+  assert.equal(res.reason, 'no-terminal');
+  assert.ok(res.command.includes('claude "$(cat'));
 });
 
 test('improveCommand rejects quote in path', () => {

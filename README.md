@@ -24,7 +24,7 @@
 ## About
 
 Chan to Yare is a dashboard for people who run many Claude Code sessions
-at once in [cmux](https://github.com/manaflow-ai/cmux) tabs. When a dozen
+at once in terminal tabs. When a dozen
 sessions are going, it is easy to lose track of which ones are waiting for
 you and which ones are still working. Chan to Yare puts every session on one screen, sorted
 by whose turn it is, and tells you the moment one needs you.
@@ -46,7 +46,7 @@ The name is Japanese for "do it properly."
 - Sessions are sorted by whose turn it is: Your turn, Claude's turn, and untouched for 12+ hours.
 - Each row says why the session is waiting (a question, a plan, a tool approval) or what Claude is running.
 - A 3-hour track shows when Claude worked and how long it has waited on you.
-- Open a row to read the last exchange, send a note, or end the session. Open jumps to its cmux tab.
+- Open a row to read the last exchange, send a note, or end the session. Open jumps to its tab in cmux or tmux.
 
 ### Last 7 days
 
@@ -72,14 +72,27 @@ The name is Japanese for "do it properly."
 
 - Every session from the last 31 days that is no longer running, newest first.
 - Search what you asked, titles, repositories, branches and PRs (`#123`), with Japanese and full-width spaces.
-- Resume continues the conversation in a new cmux workspace. Hand off starts a fresh session with a short brief and a pointer to the log.
+- Resume continues the conversation in a new tab. Hand off starts a fresh session with a short brief and a pointer to the log.
 - Each session shows its context size. Resuming after the prompt cache has expired re-reads all of it, so Hand off is cheaper for a quick follow-up.
 - The same Resume and Hand off buttons sit next to each session in the PRs view.
 
 ## Install
 
-You need macOS, Node 20 or later, [cmux](https://github.com/manaflow-ai/cmux), and Claude Code.
+You need macOS, Node 20 or later, and Claude Code.
 The PRs view also needs the [GitHub CLI](https://cli.github.com) signed in.
+
+Sessions in any terminal show up on the board. Jumping to a session,
+sending it a note, ending it, and opening new sessions need one of these:
+
+| Terminal                                          | Open, Send, Exit | Resume, Hand off, Improve Claude |
+| ------------------------------------------------- | :--------------: | :------------------------------: |
+| [cmux](https://github.com/manaflow-ai/cmux)       |        ✅        |                ✅                |
+| [tmux](https://github.com/tmux/tmux), in any app  |        ✅        |                ✅                |
+| Others (iTerm2, Terminal, Ghostty, VS Code, ...)  |        ❌        |   Copy the command and run it    |
+
+New sessions open in the terminal with the most running sessions. To pick
+one, write `{ "launcher": "tmux" }` (or `"cmux"`) to
+`~/.config/cc-dashboard/config.json`.
 
 ```sh
 git clone git@github.com:Ryoma0219/chan_to_yare.git
@@ -113,7 +126,7 @@ See [HACKING.md](HACKING.md) for details.
 | PRs         | Each PR you opened in the last 30 days next to the sessions behind it, on four axes                       |
 | Ended       | Sessions from the last 31 days that are no longer running, searchable, with Resume and Hand off           |
 
-From the Live view you can open a session's cmux tab, read its last
+From the Live view you can open a session's terminal tab, read its last
 exchange, and send it a note ("Send" or "Remember") without leaving the
 board. Sessions in Your turn have an Exit button that sends
 `/exit` (click twice). "Improve Claude", in the header or in a session's

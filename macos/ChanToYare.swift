@@ -464,7 +464,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     }
   }
 
-  // MARK: - Notifications (アプリ → cmux のタブ)
+  // MARK: - Notifications (アプリ → 端末のタブ)
 
   func userNotificationCenter(
     _ center: UNUserNotificationCenter, willPresent notification: UNNotification,

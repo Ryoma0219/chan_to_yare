@@ -278,7 +278,7 @@ window.PRs = (() => {
     const wrap = h('span', 'launch');
     const b = h('button', 'tool', 'Open');
     b.type = 'button';
-    b.title = 'This session is running. Jump to its cmux tab.';
+    b.title = 'This session is running. Jump to its terminal tab.';
     const note = h('span', 'launch-note muted');
     note.setAttribute('role', 'status');
     b.addEventListener('click', async (e) => {
@@ -289,9 +289,9 @@ window.PRs = (() => {
           headers: { 'Content-Type': 'application/json', 'X-CC-Dashboard': '1' },
           body: JSON.stringify({ sessionId: s.id }),
         });
-        note.textContent = res.ok ? '' : 'Could not find its cmux tab.';
+        note.textContent = res.ok ? '' : 'Could not find its terminal tab.';
       } catch {
-        note.textContent = 'Could not find its cmux tab.';
+        note.textContent = 'Could not find its terminal tab.';
       }
     });
     wrap.append(b, note);

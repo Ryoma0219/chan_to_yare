@@ -58,7 +58,7 @@ const SECURITY_HEADERS = {
 // 同一オリジン・独自ヘッダー・JSON の検査をかける書き込み系
 const POST_ROUTES = new Set(['/api/focus', '/api/memo', '/api/exit', '/api/improve', '/api/resume', '/api/handoff']);
 
-function runCmux(cmd, args) {
+function runTerminal(cmd, args) {
   return new Promise((resolve) => {
     execFile(cmd, args, { timeout: 5000 }, (err, stdout) => resolve(err ? null : stdout));
   });
@@ -276,8 +276,8 @@ async function handle(req, res) {
         const st = findSession(await analytics.files30(), sessionId);
         result =
           url.pathname === '/api/resume'
-            ? await launchResume({ st, running: collector.runningIds().has(sessionId), recent: recentLaunches, run: runCmux })
-            : await launchHandoff({ st, transcript: st?.file ?? null, prInfo: (u) => github.prInfo(u), run: runCmux });
+            ? await launchResume({ st, running: collector.runningIds().has(sessionId), recent: recentLaunches, run: runTerminal, launcher: collector.launcher() })
+            : await launchHandoff({ st, transcript: st?.file ?? null, prInfo: (u) => github.prInfo(u), run: runTerminal, launcher: collector.launcher() });
       } catch (e) {
         console.error('[launch]', e);
         result = { ok: false, reason: 'launch-failed' };
@@ -292,7 +292,7 @@ async function handle(req, res) {
         if (!session) return send(res, 409, JSON.stringify({ ok: false, reason: 'session-not-found' }), { 'Content-Type': 'application/json' });
       }
       try {
-        result = await launchImprove({ text, session, run: runCmux });
+        result = await launchImprove({ text, session, run: runTerminal, launcher: collector.launcher() });
       } catch (e) {
         // ~/.cache に書けないなど。例外を逃がすとサーバーが落ち、待ち中の Exit も巻き添えになる
         console.error('[improve]', e);
