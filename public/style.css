@@ -700,3 +700,6 @@ dialog.improve .composer { border-bottom: 0; padding-bottom: 0.75rem; }
 .launch-note { font-size: var(--step--1); }
 .ended-name { font-size: var(--step--1); }
 .pr-session { display: grid; gap: 0.3rem; padding: 0.3rem 0; }
+.pr-filter { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.pr-filter .tool { height: 26px; padding: 0 0.6rem; font-size: var(--step--1); }
+.pr-filter .tool[aria-pressed="true"] { background: var(--raised); border-color: var(--ink-3); font-weight: 600; }

@@ -12,6 +12,7 @@ window.PRs = (() => {
   let timer = null;
   let sortKey = 'createdAt';
   let sortDir = -1;
+  let stateFilter = 'ALL'; // ALL / DRAFT / OPEN / MERGED / CLOSED
   const openRows = new Set();
 
   /* ---------- helpers ---------- */
@@ -366,7 +367,35 @@ window.PRs = (() => {
     return tr;
   }
 
+  // 状態での絞り込み。ブラウザ側だけで行う
+  const FILTERS = [
+    ['ALL', 'All'],
+    ['DRAFT', 'Draft'],
+    ['OPEN', 'Open'],
+    ['MERGED', 'Merged'],
+    ['CLOSED', 'Closed'],
+  ];
+  function renderFilter(d) {
+    const bar = $('pr-filter');
+    const count = (key) => (key === 'ALL' ? d.prs.length : d.prs.filter((p) => p.state === key).length);
+    bar.replaceChildren();
+    for (const [key, label] of FILTERS) {
+      const n = count(key);
+      if (key === 'CLOSED' && !n && stateFilter !== 'CLOSED') continue;
+      const b = h('button', 'tool', label);
+      b.type = 'button';
+      b.setAttribute('aria-pressed', String(stateFilter === key));
+      b.append(h('span', 'muted', ` ${num.format(n)}`));
+      b.addEventListener('click', () => {
+        stateFilter = key;
+        renderTable(data);
+      });
+      bar.append(b);
+    }
+  }
+
   function renderTable(d) {
+    renderFilter(d);
     const table = $('pr-table');
     table.replaceChildren();
     const thead = h('thead');
@@ -393,7 +422,8 @@ window.PRs = (() => {
     thead.append(hr);
     const tbody = h('tbody');
     const val = (p) => (sortKey === 'title' ? p.title : p[sortKey]);
-    const rows = d.prs.slice().sort((a, b) => {
+    const shown = stateFilter === 'ALL' ? d.prs : d.prs.filter((p) => p.state === stateFilter);
+    const rows = shown.slice().sort((a, b) => {
       const x = val(a);
       const y = val(b);
       if (x == null && y == null) return b.createdAt - a.createdAt;
@@ -452,6 +482,13 @@ window.PRs = (() => {
       });
       tbody.append(tr);
       if (open) tbody.append(detailRow(p));
+    }
+    if (!rows.length) {
+      const tr = h('tr');
+      const td = h('td', 'muted', 'No PRs in this state.');
+      td.colSpan = COLS.length;
+      tr.append(td);
+      tbody.append(tr);
     }
     table.append(thead, tbody);
   }
