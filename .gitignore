@@ -1,0 +1,5 @@
+# ビルドの生成物
+macos/build/
+node_modules/
+.DS_Store
+*.log

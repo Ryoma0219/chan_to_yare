@@ -1,0 +1,328 @@
+/* ---------------------------------------------------------------
+   Look: Future
+   Classic の上に重ねる層。:root[data-look="future"] のときだけ効く。
+   動きはすべて状態か到着を表すもの (作業中の流れ・確認待ちの波紋・
+   返事待ちの灯り・グラフの描き込み)。prefers-reduced-motion では止まる。
+   --------------------------------------------------------------- */
+@font-face {
+  font-family: "Chakra Petch";
+  src: url("/fonts/chakra-petch-500.woff2") format("woff2");
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Chakra Petch";
+  src: url("/fonts/chakra-petch-600.woff2") format("woff2");
+  font-weight: 600;
+  font-display: swap;
+}
+
+:root[data-look="future"] {
+  --font-tech: "Chakra Petch", var(--font-ui);
+  --glow-claude: oklch(0.70 calc(0.14 * var(--sat-claude)) var(--h-claude) / 0.55);
+  --glow-you: oklch(0.80 0.15 var(--h-you) / 0.55);
+  --glow-ask: oklch(0.70 0.19 var(--h-ask) / 0.6);
+  --hud: oklch(0.70 calc(0.10 * var(--sat-claude)) var(--h-claude) / 0.38);
+  --hud-soft: oklch(0.70 calc(0.10 * var(--sat-claude)) var(--h-claude) / 0.14);
+  --glass: oklch(0.22 calc(0.02 * var(--tint)) var(--h-ground) / 0.62);
+  --aurora-a: oklch(0.45 calc(0.12 * var(--sat-claude)) var(--h-claude) / 0.22);
+  --aurora-b: oklch(0.55 0.13 var(--h-you) / 0.10);
+  --aurora-c: oklch(0.45 0.13 var(--h-aux) / 0.14);
+  --grid-line: oklch(0.75 calc(0.05 * var(--sat-claude)) var(--h-claude) / 0.06);
+}
+@media (prefers-color-scheme: light) {
+  :root[data-look="future"]:not([data-theme="dark"]) {
+    --glow-claude: oklch(0.60 calc(0.14 * var(--sat-claude)) var(--h-claude) / 0.35);
+    --glow-you: oklch(0.70 0.15 var(--h-you) / 0.35);
+    --glow-ask: oklch(0.60 0.19 var(--h-ask) / 0.35);
+    --hud: oklch(0.55 calc(0.10 * var(--sat-claude)) var(--h-claude) / 0.35);
+    --hud-soft: oklch(0.55 calc(0.10 * var(--sat-claude)) var(--h-claude) / 0.12);
+    --glass: oklch(0.99 calc(0.005 * var(--tint)) var(--h-ground) / 0.72);
+    --aurora-a: oklch(0.80 calc(0.08 * var(--sat-claude)) var(--h-claude) / 0.35);
+    --aurora-b: oklch(0.88 0.09 var(--h-you) / 0.30);
+    --aurora-c: oklch(0.82 0.07 var(--h-aux) / 0.25);
+    --grid-line: oklch(0.45 calc(0.05 * var(--tint)) var(--h-ground) / 0.06);
+  }
+}
+
+/* ---------- ground: a slow aurora over a fine grid ---------- */
+:root[data-look="future"] body { background: var(--ground); isolation: isolate; }
+:root[data-look="future"] body::before,
+:root[data-look="future"] body::after {
+  content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+}
+:root[data-look="future"] body::before {
+  background:
+    linear-gradient(var(--grid-line) 1px, transparent 1px) 0 0 / 44px 44px,
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px) 0 0 / 44px 44px;
+  mask-image: radial-gradient(ellipse 85% 70% at 50% 0%, #000 30%, transparent 85%);
+}
+:root[data-look="future"] body::after {
+  background:
+    radial-gradient(40vw 30vw at 12% 8%, var(--aurora-a), transparent 70%),
+    radial-gradient(35vw 28vw at 88% 4%, var(--aurora-c), transparent 70%),
+    radial-gradient(45vw 30vw at 60% 100%, var(--aurora-b), transparent 70%);
+  filter: blur(20px);
+  animation: aurora 38s ease-in-out infinite alternate;
+}
+@keyframes aurora {
+  0% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(-3%, 2%, 0) scale(1.06); }
+  100% { transform: translate3d(2%, -1%, 0) scale(1.02); }
+}
+
+/* ---------- header: glass with a scanning edge ---------- */
+:root[data-look="future"] .bar {
+  background: var(--glass);
+  backdrop-filter: blur(14px) saturate(1.3);
+  -webkit-backdrop-filter: blur(14px) saturate(1.3);
+  border-bottom-color: transparent;
+}
+:root[data-look="future"] .bar::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px;
+  background:
+    linear-gradient(90deg, transparent, var(--glow-claude) 45%, var(--glow-you) 55%, transparent) -40% 0 / 40% 100% no-repeat,
+    linear-gradient(90deg, transparent, var(--hud) 20%, var(--hud) 80%, transparent);
+  animation: scan 7s cubic-bezier(0.6, 0, 0.4, 1) infinite;
+}
+@keyframes scan { to { background-position: 140% 0, 0 0; } }
+
+:root[data-look="future"] .brand {
+  font-family: var(--font-tech); font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase;
+  display: inline-flex; align-items: center; gap: 0.6rem;
+}
+:root[data-look="future"] .brand::before {
+  content: ""; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--claude); box-shadow: 0 0 0 0 var(--glow-claude);
+}
+/* 新しいデータを受け取ったときだけ1回脈打つ */
+:root[data-look="future"] .brand.beat::before { animation: heartbeat 900ms ease-out; }
+:root[data-look="future"] body.link-down .brand::before { background: var(--ask); animation: none; }
+@keyframes heartbeat {
+  0% { box-shadow: 0 0 0 0 var(--glow-claude); }
+  70% { box-shadow: 0 0 0 9px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+:root[data-look="future"] .views a { font-family: var(--font-tech); letter-spacing: 0.06em; }
+:root[data-look="future"] .views a[aria-current="page"] {
+  background: var(--hud-soft); box-shadow: inset 0 0 0 1px var(--hud), 0 0 18px -6px var(--glow-claude);
+}
+:root[data-look="future"] .tally b, :root[data-look="future"] .elapsed, :root[data-look="future"] .ledger dd,
+:root[data-look="future"] .small-figures dd, :root[data-look="future"] .col-value, :root[data-look="future"] .week-total b {
+  font-family: var(--font-tech);
+}
+
+/* ---------- lane headings: HUD tick ---------- */
+:root[data-look="future"] .lane-head h2 { font-family: var(--font-tech); letter-spacing: 0.08em; text-transform: uppercase; font-size: 1rem; }
+:root[data-look="future"] .lane:not(.shelf) .lane-head h2::before {
+  content: ""; width: 14px; height: 2px; align-self: center; border-radius: 1px;
+  background: currentColor; opacity: 0.55;
+}
+:root[data-look="future"] #h-you { color: var(--you); }
+:root[data-look="future"] #h-claude { color: var(--claude); }
+:root[data-look="future"] .axis { font-family: var(--font-tech); letter-spacing: 0.04em; }
+
+/* ---------- rows: glass, a spotlight that follows the pointer ---------- */
+:root[data-look="future"] .row {
+  position: relative; border-top: 0;
+  background: color-mix(in oklch, var(--raised) 38%, transparent);
+  box-shadow: inset 0 0 0 1px var(--hud-soft);
+  border-radius: 10px; margin-top: 6px;
+  overflow: hidden;
+}
+:root[data-look="future"] .row::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0;
+  background: radial-gradient(360px circle at var(--mx, 50%) var(--my, 50%), var(--hud-soft), transparent 70%);
+  transition: opacity 220ms var(--ease-out);
+}
+:root[data-look="future"] .row:hover::before { opacity: 1; }
+:root[data-look="future"] .row:hover { background: color-mix(in oklch, var(--raised) 55%, transparent); }
+:root[data-look="future"] .row.open {
+  background: color-mix(in oklch, var(--raised) 78%, transparent);
+  box-shadow: inset 0 0 0 1px var(--hud), 0 18px 50px -24px var(--glow-claude);
+}
+:root[data-look="future"] .rows.compact .row { margin-top: 3px; border-radius: 8px; }
+
+/* arrival: a beam sweeps across the row once */
+:root[data-look="future"] .row.arrived { animation: none; }
+:root[data-look="future"] .row.arrived::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(100deg, transparent 20%, var(--glow-you) 50%, transparent 80%) -120% 0 / 60% 100% no-repeat;
+  animation: beam 1400ms var(--ease-out) forwards;
+}
+:root[data-look="future"] .row.arrived[data-state="ask"]::after {
+  background-image: linear-gradient(100deg, transparent 20%, var(--glow-ask) 50%, transparent 80%);
+}
+@keyframes beam { to { background-position: 220% 0; opacity: 0; } }
+
+/* ---------- state marks: orbit / ripple / lamp ---------- */
+:root[data-look="future"] .state { position: relative; }
+:root[data-look="future"] .row[data-state="work"] .mark { animation: orbit 2.2s linear infinite; overflow: visible; }
+:root[data-look="future"] .row[data-state="work"] .mark circle:first-child { stroke-dasharray: 18 10; }
+@keyframes orbit { to { transform: rotate(360deg); } }
+:root[data-look="future"] .row[data-state="reply"] .mark { filter: drop-shadow(0 0 4px var(--glow-you)); animation: lamp 3.2s ease-in-out infinite; }
+@keyframes lamp { 50% { filter: drop-shadow(0 0 9px var(--glow-you)); } }
+:root[data-look="future"] .row[data-state="ask"] .state::before,
+:root[data-look="future"] .row[data-state="ask"] .state::after {
+  content: ""; position: absolute; left: 0; top: 0.15rem; width: 12px; height: 12px; border-radius: 50%;
+  border: 1.5px solid var(--ask); opacity: 0; pointer-events: none;
+  animation: ripple 2s ease-out infinite;
+}
+:root[data-look="future"] .row[data-state="ask"] .state::after { animation-delay: 1s; }
+@keyframes ripple { 0% { transform: scale(0.6); opacity: 0.9; } 100% { transform: scale(3.2); opacity: 0; } }
+:root[data-look="future"] .rows.compact .row .mark { animation: none; filter: none; }
+
+/* ---------- relay track: flow on Claude's live turn, a lit wire for yours ---------- */
+:root[data-look="future"] .track .seg.claude { box-shadow: 0 0 8px -2px var(--glow-claude); }
+:root[data-look="future"] .track .seg.claude.live {
+  background:
+    linear-gradient(90deg, transparent, oklch(1 0 0 / 0.55), transparent) -60% 0 / 50% 100% no-repeat,
+    var(--claude);
+  animation: flow 1.6s linear infinite;
+  box-shadow: 0 0 12px var(--glow-claude);
+}
+@keyframes flow { to { background-position: 160% 0, 0 0; } }
+:root[data-look="future"] .track .seg.you { box-shadow: 0 0 10px var(--glow-you); }
+:root[data-look="future"] .track .seg.ask { box-shadow: 0 0 12px var(--glow-ask); animation: lamp-ask 1.6s ease-in-out infinite; }
+@keyframes lamp-ask { 50% { box-shadow: 0 0 20px var(--glow-ask); } }
+:root[data-look="future"] .track .now { background: linear-gradient(var(--hud), var(--ink-2), var(--hud)); box-shadow: 0 0 8px var(--glow-claude); }
+:root[data-look="future"] .row[data-state="reply"] .track .now::after,
+:root[data-look="future"] .row[data-state="ask"] .track .now::after {
+  content: ""; position: absolute; top: 50%; left: -3px; width: 7px; height: 7px; margin-top: -3.5px; border-radius: 50%;
+  background: var(--you-mark); box-shadow: 0 0 10px var(--glow-you);
+}
+:root[data-look="future"] .row[data-state="ask"] .track .now::after { background: var(--ask); box-shadow: 0 0 10px var(--glow-ask); }
+
+/* ---------- controls ---------- */
+:root[data-look="future"] .jump, :root[data-look="future"] .tool, :root[data-look="future"] .btn {
+  border-color: var(--hud); background: var(--hud-soft);
+}
+:root[data-look="future"] .jump:hover, :root[data-look="future"] .tool:hover, :root[data-look="future"] .btn:hover:not(:disabled) {
+  box-shadow: 0 0 0 1px var(--hud), 0 0 16px -4px var(--glow-claude);
+}
+:root[data-look="future"] .btn.primary {
+  background: linear-gradient(135deg, var(--claude), color-mix(in oklch, var(--claude) 60%, var(--you)));
+  border-color: transparent; color: oklch(0.15 0.02 250);
+}
+:root[data-look="future"] .composer textarea { background: color-mix(in oklch, var(--ground) 70%, transparent); border-color: var(--hud); }
+:root[data-look="future"] .composer textarea:focus { box-shadow: 0 0 0 3px var(--hud-soft), 0 0 24px -8px var(--glow-claude); }
+
+/* ---------- insights: HUD panels and charts that draw themselves in ---------- */
+:root[data-look="future"] .ins-head h2 { font-family: var(--font-tech); letter-spacing: 0.1em; text-transform: uppercase; }
+:root[data-look="future"] .ledger { border-color: var(--hud-soft); }
+:root[data-look="future"] .ledger dt { letter-spacing: 0.04em; }
+:root[data-look="future"] .panel {
+  position: relative; padding: 1.25rem 1.4rem 1.4rem;
+  background: color-mix(in oklch, var(--raised) 32%, transparent);
+  border-radius: 12px; box-shadow: inset 0 0 0 1px var(--hud-soft);
+}
+/* corner brackets */
+:root[data-look="future"] .panel::before,
+:root[data-look="future"] .panel::after {
+  content: ""; position: absolute; width: 14px; height: 14px; pointer-events: none; border: 1.5px solid var(--hud);
+}
+:root[data-look="future"] .panel::before { top: -1px; left: -1px; border-right: 0; border-bottom: 0; border-top-left-radius: 12px; }
+:root[data-look="future"] .panel::after { bottom: -1px; right: -1px; border-left: 0; border-top: 0; border-bottom-right-radius: 12px; }
+:root[data-look="future"] .panel-pair { gap: 2rem 2rem; }
+:root[data-look="future"] .panel-head h3 { font-family: var(--font-tech); letter-spacing: 0.05em; font-size: 1rem; }
+
+:root[data-look="future"] .week-plot .stroke.working { filter: drop-shadow(0 0 3px var(--glow-claude)); }
+:root[data-look="future"] .week-plot .stroke.waiting { filter: drop-shadow(0 0 3px var(--glow-you)); }
+:root[data-look="future"] .col-bar.working { background: linear-gradient(to top, color-mix(in oklch, var(--series-claude) 55%, transparent), var(--series-claude)); box-shadow: 0 0 14px -4px var(--glow-claude); }
+:root[data-look="future"] .col-bar.waiting { background: linear-gradient(to top, color-mix(in oklch, var(--series-you) 55%, transparent), var(--series-you)); box-shadow: 0 0 14px -4px var(--glow-you); }
+:root[data-look="future"] .hbar-fill.working, :root[data-look="future"] .seg.working, :root[data-look="future"] .meter.working .meter-fill {
+  background: linear-gradient(90deg, color-mix(in oklch, var(--series-claude) 60%, transparent), var(--series-claude));
+  box-shadow: 0 0 10px -2px var(--glow-claude);
+}
+
+/* entrance: each block rises in when it scrolls into view, then its charts draw themselves.
+   .pre = waiting below the fold, .in = revealed, .settled = done (refreshes never replay) */
+:root[data-look="future"] .anim { transition: opacity 700ms var(--ease-out), transform 700ms var(--ease-out); }
+:root[data-look="future"] .anim.pre { opacity: 0; transform: translateY(22px); }
+:root[data-look="future"] .anim.in:not(.settled) .week-plot .stroke { stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw 1700ms var(--ease-out) forwards; }
+:root[data-look="future"] .anim.in:not(.settled) .week-plot .area { opacity: 0; animation: fade-in 900ms 800ms var(--ease-out) forwards; }
+:root[data-look="future"] .anim.in:not(.settled) .week-plot .now { opacity: 0; animation: fade-full 600ms 1400ms forwards; }
+:root[data-look="future"] .anim.in:not(.settled) .week-row:nth-child(3) .stroke { animation-delay: 80ms; }
+:root[data-look="future"] .anim.in:not(.settled) .week-row:nth-child(4) .stroke { animation-delay: 160ms; }
+:root[data-look="future"] .anim.in:not(.settled) .week-row:nth-child(5) .stroke { animation-delay: 240ms; }
+:root[data-look="future"] .anim.in:not(.settled) .week-row:nth-child(6) .stroke { animation-delay: 320ms; }
+:root[data-look="future"] .anim.in:not(.settled) .week-row:nth-child(7) .stroke { animation-delay: 400ms; }
+:root[data-look="future"] .anim.in:not(.settled) .week-row:nth-child(8) .stroke { animation-delay: 480ms; }
+:root[data-look="future"] .anim.in:not(.settled) .week-total { opacity: 0; animation: fade-full 700ms 900ms forwards; }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+@keyframes fade-in { to { opacity: 0.16; } }
+@keyframes fade-full { to { opacity: 1; } }
+
+:root[data-look="future"] .anim.in:not(.settled) .col-bar { transform-origin: bottom; animation: rise 900ms var(--ease-out) both; }
+:root[data-look="future"] .anim.in:not(.settled) .col-value { animation: fade-up 600ms var(--ease-out) both; }
+:root[data-look="future"] .anim.in:not(.settled) .col:nth-child(2) :is(.col-bar, .col-value) { animation-delay: 70ms; }
+:root[data-look="future"] .anim.in:not(.settled) .col:nth-child(3) :is(.col-bar, .col-value) { animation-delay: 140ms; }
+:root[data-look="future"] .anim.in:not(.settled) .col:nth-child(4) :is(.col-bar, .col-value) { animation-delay: 210ms; }
+:root[data-look="future"] .anim.in:not(.settled) .col:nth-child(5) :is(.col-bar, .col-value) { animation-delay: 280ms; }
+:root[data-look="future"] .anim.in:not(.settled) .col:nth-child(6) :is(.col-bar, .col-value) { animation-delay: 350ms; }
+:root[data-look="future"] .anim.in:not(.settled) .col:nth-child(7) :is(.col-bar, .col-value) { animation-delay: 420ms; }
+@keyframes rise { from { transform: scaleY(0); } }
+@keyframes fade-up { from { opacity: 0; transform: translateY(8px); } }
+
+:root[data-look="future"] .anim.in:not(.settled) :is(.hbar-fill, .meter-fill, .segbar) { transform-origin: left; animation: extend 1100ms var(--ease-out) both; }
+:root[data-look="future"] .anim.in:not(.settled) :is(.ranked, .meters, .shares) > li,
+:root[data-look="future"] .anim.in:not(.settled) :is(.repo-table, .compare-table) tbody tr,
+:root[data-look="future"] .anim.in:not(.settled) .ledger-item { animation: fade-up 600ms var(--ease-out) both; }
+:root[data-look="future"] .anim.in:not(.settled) :is(.ranked, .meters, .shares) > li:nth-child(2),
+:root[data-look="future"] .anim.in:not(.settled) :is(.repo-table, .compare-table) tbody tr:nth-child(2),
+:root[data-look="future"] .anim.in:not(.settled) .ledger-item:nth-child(2) { animation-delay: 50ms; }
+:root[data-look="future"] .anim.in:not(.settled) :is(.ranked, .meters, .shares) > li:nth-child(3),
+:root[data-look="future"] .anim.in:not(.settled) :is(.repo-table, .compare-table) tbody tr:nth-child(3),
+:root[data-look="future"] .anim.in:not(.settled) .ledger-item:nth-child(3) { animation-delay: 100ms; }
+:root[data-look="future"] .anim.in:not(.settled) :is(.ranked, .meters, .shares) > li:nth-child(4),
+:root[data-look="future"] .anim.in:not(.settled) :is(.repo-table, .compare-table) tbody tr:nth-child(4),
+:root[data-look="future"] .anim.in:not(.settled) .ledger-item:nth-child(4) { animation-delay: 150ms; }
+:root[data-look="future"] .anim.in:not(.settled) :is(.ranked, .meters, .shares) > li:nth-child(5),
+:root[data-look="future"] .anim.in:not(.settled) :is(.repo-table, .compare-table) tbody tr:nth-child(5),
+:root[data-look="future"] .anim.in:not(.settled) .ledger-item:nth-child(5) { animation-delay: 200ms; }
+:root[data-look="future"] .anim.in:not(.settled) :is(.ranked, .meters, .shares) > li:nth-child(n+6),
+:root[data-look="future"] .anim.in:not(.settled) :is(.repo-table, .compare-table) tbody tr:nth-child(n+6),
+:root[data-look="future"] .anim.in:not(.settled) .ledger-item:nth-child(n+6) { animation-delay: 250ms; }
+@keyframes extend { from { transform: scaleX(0); } }
+
+/* Live: rows rise in one after another and their relay tracks draw from the left */
+:root[data-look="future"] .board.enter .row { animation: fade-up 650ms var(--ease-out) both; animation-delay: calc(var(--i, 0) * 55ms); }
+:root[data-look="future"] .board.enter .track .seg { transform-origin: left; animation: extend 1000ms var(--ease-out) both; animation-delay: calc(250ms + var(--i, 0) * 55ms); }
+:root[data-look="future"] .board.enter .lane-head { animation: fade-up 500ms var(--ease-out) both; }
+
+:root[data-look="future"] .axis-metric dd { font-family: var(--font-tech); }
+:root[data-look="future"] .mini-col.current .mini-bar { box-shadow: 0 0 10px -2px var(--glow-claude); }
+:root[data-look="future"] .scatter .mark.merged { filter: drop-shadow(0 0 4px var(--glow-claude)); }
+:root[data-look="future"] .scatter .ring.rework { filter: drop-shadow(0 0 4px var(--glow-you)); }
+:root[data-look="future"] .anim.in:not(.settled) .mini-bar { transform-origin: bottom; animation: rise 800ms var(--ease-out) both; }
+:root[data-look="future"] .anim.in:not(.settled) .mini-col:nth-child(2) .mini-bar { animation-delay: 60ms; }
+:root[data-look="future"] .anim.in:not(.settled) .mini-col:nth-child(3) .mini-bar { animation-delay: 120ms; }
+:root[data-look="future"] .anim.in:not(.settled) .mini-col:nth-child(4) .mini-bar { animation-delay: 180ms; }
+:root[data-look="future"] .anim.in:not(.settled) .mini-col:nth-child(5) .mini-bar { animation-delay: 240ms; }
+:root[data-look="future"] .anim.in:not(.settled) .mini-col:nth-child(n+6) .mini-bar { animation-delay: 300ms; }
+:root[data-look="future"] .anim.in:not(.settled) .scatter .pt { animation: pop 700ms var(--ease-out) both; animation-delay: calc(min(var(--i, 0), 60) * 12ms); transform-box: fill-box; transform-origin: center; }
+@keyframes pop { from { opacity: 0; transform: scale(0.2); } }
+:root[data-look="future"] .anim.in:not(.settled) .pr-table tbody tr:nth-child(-n+12) { animation: fade-up 600ms var(--ease-out) both; }
+:root[data-look="future"] .anim.in:not(.settled) .pr-table tbody tr:nth-child(2) { animation-delay: 40ms; }
+:root[data-look="future"] .anim.in:not(.settled) .pr-table tbody tr:nth-child(3) { animation-delay: 80ms; }
+:root[data-look="future"] .anim.in:not(.settled) .pr-table tbody tr:nth-child(4) { animation-delay: 120ms; }
+:root[data-look="future"] .anim.in:not(.settled) .pr-table tbody tr:nth-child(5) { animation-delay: 160ms; }
+:root[data-look="future"] .anim.in:not(.settled) .pr-table tbody tr:nth-child(n+6) { animation-delay: 200ms; }
+
+/* tooltip */
+:root[data-look="future"] .tip {
+  background: var(--glass); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  border-color: var(--hud); box-shadow: 0 10px 30px -10px oklch(0 0 0 / 0.5), 0 0 20px -8px var(--glow-claude);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-look="future"] body::after,
+  :root[data-look="future"] .bar::after,
+  :root[data-look="future"] .brand::before,
+  :root[data-look="future"] .mark,
+  :root[data-look="future"] .state::before,
+  :root[data-look="future"] .state::after,
+  :root[data-look="future"] .track .seg,
+  :root[data-look="future"] .anim *, :root[data-look="future"] .board.enter * { animation: none !important; }
+  :root[data-look="future"] .anim.pre { opacity: 1; transform: none; }
+}

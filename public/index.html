@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en" data-type="medium" data-look="future">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Chan to Yare</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/themes.css">
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/future.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&display=swap">
+<script src="/look.js"></script>
+<script src="/chime.js" defer></script>
+<script src="/app.js" defer></script>
+<script src="/insights.js" defer></script>
+<script src="/prs.js" defer></script>
+</head>
+<body>
+<svg class="sprite" aria-hidden="true">
+  <symbol id="i-open" viewBox="0 0 16 16"><path d="M9.5 2.5h4v4M13.5 2.5 7.5 8.5M11.5 9.5v3a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h3"/></symbol>
+  <symbol id="i-pr" viewBox="0 0 16 16"><circle cx="4" cy="3.5" r="1.5"/><circle cx="4" cy="12.5" r="1.5"/><circle cx="12" cy="12.5" r="1.5"/><path d="M4 5v6M12 11V6a2 2 0 0 0-2-2H7.5M9 2.5 7.5 4 9 5.5"/></symbol>
+  <symbol id="i-branch" viewBox="0 0 16 16"><circle cx="4.5" cy="3.5" r="1.5"/><circle cx="4.5" cy="12.5" r="1.5"/><circle cx="11.5" cy="5" r="1.5"/><path d="M4.5 5v6M11.5 6.5c0 3-7 2.5-7 4.5"/></symbol>
+  <symbol id="i-sound" viewBox="0 0 16 16"><path d="M2.5 6v4h2.5l3.5 3V3L5 6z"/><path d="M11 5.5a3.5 3.5 0 0 1 0 5M12.8 3.5a6 6 0 0 1 0 9"/></symbol>
+  <symbol id="i-mute" viewBox="0 0 16 16"><path d="M2.5 6v4h2.5l3.5 3V3L5 6z"/><path d="m11 6 3.5 4M14.5 6 11 10"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 16 16"><path d="M4 11.5V7a4 4 0 0 1 8 0v4.5l1 1H3zM6.5 14a1.6 1.6 0 0 0 3 0"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 16 16"><rect x="5.5" y="5.5" width="8" height="8" rx="1"/><path d="M10.5 3.5v-.5a1 1 0 0 0-1-1h-6a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h.5"/></symbol>
+  <symbol id="i-chevron" viewBox="0 0 16 16"><path d="m6 4 4 4-4 4"/></symbol>
+  <symbol id="i-send" viewBox="0 0 16 16"><path d="M2.5 8h9M8.5 4.5 12 8l-3.5 3.5"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 16 16"><path d="M8 1.5v3M8 11.5v3M1.5 8h3M11.5 8h3M3.4 3.4l2 2M10.6 10.6l2 2M12.6 3.4l-2 2M5.4 10.6l-2 2"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 16 16"><path d="M4.5 2.5h7v11L8 11l-3.5 2.5z"/></symbol>
+</svg>
+
+<header class="bar">
+  <h1 class="brand">Chan to Yare</h1>
+  <nav class="views" aria-label="Views">
+    <a href="#live" id="nav-live" aria-current="page">Live</a>
+    <a href="#insights" id="nav-insights">Last 7 days</a>
+    <a href="#prs" id="nav-prs">PRs</a>
+  </nav>
+  <p class="tally" id="tally" aria-live="polite"></p>
+  <div class="bar-tools">
+    <span class="link-state" id="link-state" role="status"></span>
+    <button type="button" class="tool" id="notify-btn" hidden>
+      <svg class="icon"><use href="#i-bell"/></svg><span>Allow notifications</span>
+    </button>
+    <button type="button" class="tool" id="sound-btn" aria-pressed="false">
+      <svg class="icon"><use href="#i-mute"/></svg><span>Enable sound</span>
+    </button>
+  </div>
+</header>
+
+<main id="board" class="board" aria-busy="true">
+  <section class="lane" id="lane-you" aria-labelledby="h-you">
+    <div class="lane-head">
+      <h2 id="h-you">Your turn</h2>
+      <div class="axis" aria-hidden="true" id="axis"></div>
+    </div>
+    <ol class="rows" id="rows-you"></ol>
+    <p class="lane-empty" id="empty-you" hidden>No session is waiting on you.</p>
+  </section>
+
+  <section class="lane" id="lane-claude" aria-labelledby="h-claude">
+    <div class="lane-head">
+      <h2 id="h-claude">Claude’s turn</h2>
+    </div>
+    <ol class="rows" id="rows-claude"></ol>
+    <p class="lane-empty" id="empty-claude" hidden>No session is working right now.</p>
+  </section>
+
+  <details class="lane shelf" id="lane-shelf">
+    <summary class="lane-head">
+      <h2><svg class="icon chev"><use href="#i-chevron"/></svg>Untouched for 12+ hours<span class="count" id="count-shelf"></span></h2>
+    </summary>
+    <ol class="rows compact" id="rows-shelf"></ol>
+  </details>
+
+  <div class="nothing" id="nothing" hidden>
+    <p class="nothing-title">No Claude Code sessions are running</p>
+    <p>Start <code>claude</code> in a cmux tab and it shows up here.</p>
+  </div>
+</main>
+
+<main id="insights" class="insights" hidden aria-busy="true">
+  <div class="ins-head">
+    <h2>Last 7 days</h2>
+    <p class="ins-range" id="ins-range"></p>
+  </div>
+  <p class="ins-status" id="ins-status" role="status">Reading the last 7 days of session logs…</p>
+
+  <dl class="ledger" id="ledger"></dl>
+
+  <section class="panel" aria-labelledby="h-week">
+    <div class="panel-head">
+      <h3 id="h-week">The week, hour by hour</h3>
+      <ul class="legend" id="week-legend"></ul>
+    </div>
+    <p class="panel-note" id="week-note"></p>
+    <div class="week" id="week"></div>
+    <details class="data-table"><summary>Data table</summary><div id="week-table"></div></details>
+  </section>
+
+  <section class="panel" aria-labelledby="h-pr">
+    <div class="panel-head">
+      <h3 id="h-pr">Sessions with a PR vs. without</h3>
+      <ul class="legend" id="pr-legend"></ul>
+    </div>
+    <p class="panel-note" id="pr-note"></p>
+    <div class="pr-split">
+      <ol class="shares" id="pr-shares"></ol>
+      <div class="table-wrap"><table class="compare-table" id="pr-compare"></table></div>
+    </div>
+  </section>
+
+  <div class="panel-pair">
+    <section class="panel" aria-labelledby="h-reply">
+      <div class="panel-head">
+        <h3 id="h-reply">How long Claude waits for your reply</h3>
+      </div>
+      <p class="panel-note" id="reply-note"></p>
+      <div class="columns" id="reply-chart"></div>
+    </section>
+    <section class="panel" aria-labelledby="h-cost">
+      <div class="panel-head">
+        <h3 id="h-cost">Estimated cost per day</h3>
+      </div>
+      <p class="panel-note" id="cost-note"></p>
+      <div class="columns" id="cost-chart"></div>
+    </section>
+  </div>
+
+  <section class="panel" aria-labelledby="h-repos">
+    <div class="panel-head">
+      <h3 id="h-repos">Where Claude’s time went</h3>
+    </div>
+    <div class="table-wrap"><table class="repo-table" id="repo-table"></table></div>
+  </section>
+
+  <section class="panel" aria-labelledby="h-how">
+    <div class="panel-head">
+      <h3 id="h-how">How Claude works</h3>
+    </div>
+    <div class="how">
+      <div class="how-col">
+        <h4>Tools</h4>
+        <ol class="ranked" id="tools"></ol>
+      </div>
+      <div class="how-col">
+        <h4>Skills</h4>
+        <ol class="ranked" id="skills"></ol>
+      </div>
+      <div class="how-col">
+        <h4>Tool approvals</h4>
+        <ol class="meters" id="approvals"></ol>
+        <dl class="small-figures" id="how-figures"></dl>
+      </div>
+    </div>
+  </section>
+</main>
+
+<main id="prs" class="insights prs-view" hidden aria-busy="true">
+  <div class="ins-head">
+    <h2>Pull requests</h2>
+    <p class="ins-range" id="prs-range"></p>
+  </div>
+  <p class="ins-status" id="prs-status" role="status">Reading 30 days of session logs and your pull requests on GitHub… The first load takes about 20 seconds.</p>
+  <p class="panel-note prs-lead" id="prs-lead"></p>
+
+  <div class="axes" id="axes"></div>
+
+  <section class="panel" aria-labelledby="h-scatter">
+    <div class="panel-head">
+      <h3 id="h-scatter">Size and cost of each PR</h3>
+      <ul class="legend" id="scatter-legend"></ul>
+    </div>
+    <p class="panel-note">Both axes are logarithmic. Click a dot to open that PR in the table below.</p>
+    <div class="scatter" id="scatter"></div>
+  </section>
+
+  <section class="panel" aria-labelledby="h-prtable">
+    <div class="panel-head">
+      <h3 id="h-prtable">Every PR</h3>
+    </div>
+    <p class="panel-note">Click a column to sort. Click a row to see its sessions, reviews and rework.</p>
+    <div class="table-wrap"><table class="pr-table" id="pr-table"></table></div>
+  </section>
+</main>
+
+<div class="tip" id="tip" role="tooltip" hidden></div>
+
+<template id="row-tpl">
+  <li class="row">
+    <div class="row-line">
+      <div class="state">
+        <svg class="mark" viewBox="0 0 12 12" aria-hidden="true"></svg>
+        <span class="state-label"></span>
+        <span class="elapsed"></span>
+      </div>
+      <button type="button" class="main" aria-expanded="false">
+        <span class="title"></span>
+        <span class="meta"></span>
+        <span class="gist"></span>
+      </button>
+      <div class="track" aria-hidden="true"></div>
+      <button type="button" class="jump" title="Open this tab in cmux">
+        <svg class="icon"><use href="#i-open"/></svg><span class="jump-label">Open</span>
+      </button>
+    </div>
+    <div class="detail" hidden>
+      <div class="exchange">
+        <form class="composer">
+          <label class="composer-label">Tell this session</label>
+          <textarea rows="2" maxlength="4000" placeholder="Something to fix, change, or remember…"></textarea>
+          <div class="composer-actions">
+            <span class="composer-hint"></span>
+            <button type="submit" class="btn" value="remember"><svg class="icon"><use href="#i-pin"/></svg><span>Remember</span></button>
+            <button type="submit" class="btn primary" value="send"><svg class="icon"><use href="#i-send"/></svg><span>Send</span></button>
+          </div>
+        </form>
+        <div class="turn turn-you">
+          <h3>Your last request<time></time></h3>
+          <p class="said"></p>
+        </div>
+        <div class="turn turn-claude">
+          <h3>Claude’s last reply<time></time></h3>
+          <div class="said"></div>
+        </div>
+      </div>
+      <dl class="facts"></dl>
+    </div>
+  </li>
+</template>
+</body>
+</html>

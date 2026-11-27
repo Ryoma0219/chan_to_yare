@@ -1,0 +1,10 @@
+{
+  "name": "cc-dashboard",
+  "private": true,
+  "type": "module",
+  "description": "Claude Code の並列セッションを1画面で見渡すローカルダッシュボード",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "engines": { "node": ">=20" }
+}
