@@ -16,10 +16,27 @@ window.Ended = (() => {
     'session-running': 'This session is already running.',
     'cwd-missing': 'Its folder is gone.',
     'session-not-found': 'It is no longer in the last 31 days of logs.',
-    'cmux-failed': 'cmux did not respond. If no workspace opened, try again in 30 seconds.',
-    'launch-failed': 'cmux did not respond.',
+    'terminal-failed': 'The terminal did not respond. If no tab opened, try again in 30 seconds, or run this yourself:',
+    'no-terminal': 'No supported terminal to open it in. Run this yourself:',
+    'launch-failed': 'Could not open it.',
   };
-  const reasonText = (reason) => REASONS[reason] ?? REASONS['cmux-failed'];
+  const reasonText = (reason) => REASONS[reason] ?? REASONS['terminal-failed'];
+
+  // 開けなかった理由。手で打てるコマンドが返ってきたら、コピーボタンを添える (copyButton は app.js)
+  function showResult(note, res) {
+    if (res.ok) {
+      note.textContent = res.terminal ? `Opened in a new ${res.terminal} tab.` : 'Opened in a new tab.';
+      return;
+    }
+    const text = reasonText(res.reason);
+    if (res.command && typeof window.copyButton === 'function') {
+      const copy = window.copyButton(res.command, 'Copy command');
+      copy.addEventListener('click', (e) => e.stopPropagation());
+      note.replaceChildren(document.createTextNode(`${text} `), copy);
+    } else {
+      note.textContent = text;
+    }
+  }
 
   function h(tag, cls, text) {
     const el = document.createElement(tag);
@@ -47,9 +64,9 @@ window.Ended = (() => {
         body: JSON.stringify({ sessionId }),
       });
       const body = await res.json().catch(() => ({}));
-      return res.ok ? { ok: true } : { ok: false, reason: body.reason ?? 'cmux-failed' };
+      return res.ok ? { ok: true, terminal: body.terminal ?? null } : { ok: false, reason: body.reason ?? 'terminal-failed', command: body.command ?? null };
     } catch {
-      return { ok: false, reason: 'cmux-failed' };
+      return { ok: false, reason: 'terminal-failed' };
     }
   }
 
@@ -68,7 +85,7 @@ window.Ended = (() => {
         for (const x of wrap.querySelectorAll('button')) x.disabled = true;
         note.textContent = 'Opening…';
         const res = await post(kind, s.id);
-        note.textContent = res.ok ? 'Opened in a new cmux workspace.' : reasonText(res.reason);
+        showResult(note, res);
         onDone?.(res);
         setTimeout(() => {
           resume.disabled = !(s.resumable ?? true);

@@ -243,15 +243,39 @@ function renderMarkdown(target, text) {
 }
 
 const FAILURE = {
-  'tab-not-found': 'No cmux tab found for this session',
+  'tab-not-found': 'No terminal tab found for this session',
+  'not-supported': 'This terminal cannot do that from here',
   'session-not-found': 'The session has ended',
   'session-waiting': 'Answer the prompt in the terminal first',
   'session-waiting-after-paste': 'A prompt appeared while sending. The note was pasted but not sent; check the terminal',
-  'cmux-failed': 'Could not reach cmux',
+  'terminal-failed': 'Could not reach the terminal',
+  'cmux-failed': 'Could not reach the terminal',
+  'no-terminal': 'No supported terminal to open it in. Run this yourself:',
   'session-busy': 'Claude is working. Wait for the turn to end',
   'exit-timeout': 'The session did not exit',
   'improve-failed': 'Could not start the session',
 };
+
+// 再起動前のサーバーは tab に can と label を付けない (cmux だけだった頃の形)
+const tabCan = (tab) => tab?.can ?? { focus: true, send: true };
+const tabLabel = (tab) => tab?.label ?? 'cmux';
+
+// Send / Remember / Exit を押せない理由
+function sendBlocked(s) {
+  if (!s.tab) return 'tab-not-found';
+  if (!tabCan(s.tab).send) return 'not-supported';
+  return s.state === 'ask' ? 'session-waiting' : null;
+}
+
+// 開けなかったときの案内。手で打てるコマンドが返ってきたら、コピーボタンを添える
+function showFailure(el, result) {
+  const text = FAILURE[result.reason] ?? FAILURE['terminal-failed'];
+  if (!result.command) {
+    el.textContent = text;
+    return;
+  }
+  el.replaceChildren(document.createTextNode(`${text} `), copyButton(result.command, 'Copy command'));
+}
 
 // mcp__claude_ai_redash-mcp__execute_adhoc_query -> redash · execute_adhoc_query
 function toolName(name) {
@@ -516,7 +540,11 @@ function fillRow(row, s, now) {
   // 一目で要る順に並べ、1行に収まらない分は末尾から省略する
   if (s.repo) meta.push(metaItem(s.repo));
   for (const pr of s.prs) meta.push(metaItem(`#${pr.number}`, { icon: 'i-pr', href: pr.url }));
-  if (s.tab?.workspace) meta.push(metaItem(s.tab.workspace, { cls: 'ws' }));
+  if (s.tab?.workspace) {
+    const ws = metaItem(s.tab.workspace, { cls: 'ws' });
+    ws.dataset.terminal = tabLabel(s.tab);
+    meta.push(ws);
+  }
   const branchShown =
     s.branch && !QUIET_BRANCHES.has(s.branch) && !(s.worktree && (s.branch === s.worktree || s.branch.endsWith(`/${s.worktree}`)));
   if (s.worktree) meta.push(metaItem(s.worktree, { icon: 'i-branch', code: true, cls: 'wt' }));
@@ -548,16 +576,17 @@ function fillRow(row, s, now) {
   if (s.state !== 'dormant' && s.state !== 'fresh') drawTrack(refs.track, s, now);
   else refs.track.replaceChildren();
 
-  refs.jump.disabled = !s.tab;
-  refs.jump.title = s.tab ? `Open “${s.tab.title || s.title}” in cmux` : 'No cmux tab found for this session';
+  const jumpBlocked = !s.tab ? 'tab-not-found' : !tabCan(s.tab).focus ? 'not-supported' : null;
+  refs.jump.disabled = Boolean(jumpBlocked);
+  refs.jump.title = jumpBlocked ? FAILURE[jumpBlocked] : `Open “${s.tab.title || s.title}” in ${tabLabel(s.tab)}`;
 
   // Exit は Your turn の行だけ。確認待ちのときは /exit を打てないので押せない
   refs.exit.hidden = laneOf(s.state) !== 'you';
-  const exitBlocked = !s.tab ? 'tab-not-found' : s.state === 'ask' ? 'session-waiting' : null;
+  const exitBlocked = sendBlocked(s);
   refs.exit.disabled = Boolean(exitBlocked) || refs.exiting === true;
   if (exitBlocked) disarmExit(refs);
   if (!refs.exit.classList.contains('failed')) {
-    refs.exit.title = exitBlocked ? FAILURE[exitBlocked] : refs.exitArmed ? 'Click again to end this session' : 'End this session. The cmux tab stays open';
+    refs.exit.title = exitBlocked ? FAILURE[exitBlocked] : refs.exitArmed ? 'Click again to end this session' : 'End this session. The tab stays open';
   }
 
   refs.detail.hidden = !open;
@@ -570,7 +599,7 @@ function fillRow(row, s, now) {
       renderMarkdown(refs.claudeSaid, s.lastReply);
       refs.renderedReply = s.lastReply;
     }
-    const blocked = !s.tab ? 'tab-not-found' : s.state === 'ask' ? 'session-waiting' : null;
+    const blocked = sendBlocked(s);
     refs.composer.dataset.blocked = blocked ?? '';
     for (const b of refs.memoButtons) b.disabled = Boolean(blocked) || refs.sending === true;
     refs.improveBtn.disabled = refs.sending === true;
@@ -583,7 +612,7 @@ function fillRow(row, s, now) {
     }
     const facts = [fact('Path', codeText(s.cwd ?? 'unknown'))];
     if (s.branch) facts.push(fact('Branch', codeText(s.branch)));
-    if (s.tab) facts.push(fact('cmux', `${s.tab.workspace ?? ''} / ${s.tab.title ?? ''}`));
+    if (s.tab) facts.push(fact(tabLabel(s.tab), [s.tab.workspace, s.tab.title].filter(Boolean).join(' / ')));
     if (s.costUSD != null) facts.push(fact('Cost', `$${s.costUSD.toFixed(2)}`));
     facts.push(fact('Session', copyButton(s.id, s.name ?? s.id.slice(0, 8))));
     refs.facts.replaceChildren(...facts);
@@ -761,27 +790,29 @@ async function sendMemo(id, refs, mode) {
       body: JSON.stringify({ sessionId: id, text, mode }),
     });
     const body = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(body.reason ?? 'cmux-failed');
+    if (!res.ok) throw new Error(body.reason ?? 'terminal-failed');
     refs.memo.value = '';
     refs.hint.textContent = mode === 'remember' ? 'Sent. It will save this to memory.' : 'Sent to the session.';
     refs.composer.classList.remove('failed');
   } catch (e) {
-    refs.hint.textContent = FAILURE[e.message] ?? FAILURE['cmux-failed'];
+    refs.hint.textContent = FAILURE[e.message] ?? FAILURE['terminal-failed'];
     refs.composer.classList.add('failed');
   } finally {
     finishSending(refs);
   }
 }
 
-function finishSending(refs) {
+// holdMs の間は案内を描き直さない (コピーするコマンドを出したときは長めに残す)
+function finishSending(refs, holdMs = 4000) {
   refs.sending = false;
   refs.sentAt = Date.now();
   for (const b of refs.memoButtons) b.disabled = Boolean(refs.composer.dataset.blocked);
   refs.improveBtn.disabled = false;
-  setTimeout(() => {
+  clearTimeout(refs.holdTimer);
+  refs.holdTimer = setTimeout(() => {
     refs.sentAt = 0;
     refs.composer.classList.remove('failed');
-  }, 4000);
+  }, holdMs);
 }
 
 /* ------------------------------------------------------------
@@ -795,9 +826,9 @@ async function postImprove(text, sessionId) {
       body: JSON.stringify(sessionId ? { sessionId, text } : { text }),
     });
     const body = await res.json().catch(() => ({}));
-    return res.ok ? { ok: true } : { ok: false, reason: body.reason ?? 'cmux-failed' };
+    return res.ok ? { ok: true, terminal: body.terminal ?? null } : { ok: false, reason: body.reason ?? 'terminal-failed', command: body.command ?? null };
   } catch {
-    return { ok: false, reason: 'cmux-failed' };
+    return { ok: false, reason: 'terminal-failed' };
   }
 }
 
@@ -811,13 +842,13 @@ async function sendRowImprove(id, refs) {
   const result = await postImprove(text, id);
   if (result.ok) {
     refs.memo.value = '';
-    refs.hint.textContent = 'Opened a new session to work on this.';
+    refs.hint.textContent = result.terminal ? `Opened a new session in ${result.terminal} to work on this.` : 'Opened a new session to work on this.';
     refs.composer.classList.remove('failed');
   } else {
-    refs.hint.textContent = FAILURE[result.reason] ?? FAILURE['cmux-failed'];
+    showFailure(refs.hint, result);
     refs.composer.classList.add('failed');
   }
-  finishSending(refs);
+  finishSending(refs, result.command ? 60000 : 4000);
 }
 
 const improve = {
@@ -859,7 +890,7 @@ async function launchFromDialog() {
     improve.text.value = '';
     improve.dialog.close();
   } else {
-    improve.hint.textContent = FAILURE[result.reason] ?? FAILURE['cmux-failed'];
+    showFailure(improve.hint, result);
     improve.form.classList.add('failed');
   }
 }
@@ -900,12 +931,12 @@ async function exitSession(id, refs) {
       headers: { 'Content-Type': 'application/json', 'X-CC-Dashboard': '1' },
       body: JSON.stringify({ sessionId: id }),
     });
-    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).reason ?? 'cmux-failed');
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).reason ?? 'terminal-failed');
     // 成功したら次のスナップショットで行が消える
   } catch (e) {
     button.classList.add('failed');
     label.textContent = 'Failed';
-    button.title = FAILURE[e.message] ?? FAILURE['cmux-failed'];
+    button.title = FAILURE[e.message] ?? FAILURE['terminal-failed'];
     setTimeout(() => {
       label.textContent = 'Exit';
       button.classList.remove('failed');
@@ -918,7 +949,7 @@ async function exitSession(id, refs) {
 }
 
 /* ------------------------------------------------------------
-   Jump to the cmux tab
+   Jump to the session's terminal tab
    ------------------------------------------------------------ */
 async function jump(id, button) {
   if (button.disabled) return;
@@ -936,7 +967,7 @@ async function jump(id, button) {
     button.classList.add('failed');
     const reason = FAILURE[e.message];
     label.textContent = 'Failed';
-    button.title = reason ?? FAILURE['cmux-failed'];
+    button.title = reason ?? FAILURE['terminal-failed'];
     setTimeout(() => {
       label.textContent = 'Open';
       button.classList.remove('failed');
@@ -946,7 +977,7 @@ async function jump(id, button) {
   }
 }
 
-// アプリの通知から呼ばれる入口。行がなくても (別のタブを開いていても) cmux のタブに移る
+// アプリの通知から呼ばれる入口。行がなくても (別のタブを開いていても) 端末のタブに移る
 window.ccdJump = (id) => {
   if (typeof id !== 'string') return;
   const row = rows.get(id);

@@ -231,7 +231,7 @@ h1, h2, h3, p { margin: 0; }
 .meta .m > span { overflow: hidden; text-overflow: ellipsis; }
 .meta .m .icon { width: 13px; height: 13px; }
 .meta .code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.meta .ws::before { content: "cmux "; color: var(--ink-3); opacity: 0.8; }
+.meta .ws::before { content: attr(data-terminal) " "; color: var(--ink-3); opacity: 0.8; }
 .gist {
   color: var(--ink-2); font-size: var(--step-0);
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;

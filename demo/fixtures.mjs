@@ -26,7 +26,12 @@ export function state(now = Date.now()) {
   // [start, end] pairs in "minutes ago"; end null = still running
   const turns = (...pairs) => pairs.map(([a, b]) => [ago(a * MIN), b == null ? null : ago(b * MIN)]);
 
-  const base = (n, { workspace, ...o }) => ({
+  // terminal: 'cmux' | 'tmux' | null (Open / Send / Exit に対応していない端末)
+  const TERMINALS = { cmux: 'cmux', tmux: 'tmux' };
+  const tabOf = (terminal, title, workspace) =>
+    terminal ? { terminal, label: TERMINALS[terminal], title, workspace, can: { focus: true, send: true } } : null;
+
+  const base = (n, { workspace, terminal = 'cmux', ...o }) => ({
     id: uuid(n),
     pid: 40000 + n,
     name: o.title,
@@ -41,7 +46,7 @@ export function state(now = Date.now()) {
     turns: [],
     ...o,
     cwd: `~/code/${o.repo}${o.worktree ? `/.claude/worktrees/${o.worktree}` : ''}`,
-    tab: { surfaceId: uuid(900 + n), title: o.title, workspace },
+    tab: tabOf(terminal, o.title, workspace),
   });
 
   const sessions = [
@@ -142,6 +147,7 @@ export function state(now = Date.now()) {
       title: 'Upgrade CI to Node 22',
       repo: 'infra',
       workspace: 'infra',
+      terminal: 'tmux',
       branch: 'chore/node-22',
       since: ago(2 * MIN),
       turns: turns([48, 30], [2, null]),
@@ -180,6 +186,7 @@ export function state(now = Date.now()) {
       title: 'Read the onboarding funnel numbers',
       repo: 'analytics',
       workspace: 'analytics',
+      terminal: null,
       since: ago(19 * HOUR),
       costUSD: 3.4,
       lastPrompt: 'How many sign-ups finished onboarding last week?',
@@ -192,6 +199,7 @@ export function state(now = Date.now()) {
       title: 'Draft the Q1 on-call rotation',
       repo: 'infra',
       workspace: 'infra',
+      terminal: 'tmux',
       since: ago(2 * DAY + 3 * HOUR),
       costUSD: 0.92,
       lastPrompt: 'Draft an on-call rotation for Q1 with 6 people.',
@@ -213,7 +221,7 @@ export function state(now = Date.now()) {
     }),
   ];
 
-  return { now, sessions, cmux: true };
+  return { now, sessions, terminals: [{ id: 'tmux', label: 'tmux' }, { id: 'cmux', label: 'cmux' }] };
 }
 
 /* ------------------------------------------------------------

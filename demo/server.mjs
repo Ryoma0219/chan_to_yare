@@ -4,7 +4,7 @@
 //   node demo/server.mjs           http://127.0.0.1:7880
 //   PORT=7881 node demo/server.mjs
 //
-// It reads no session logs and calls neither cmux nor GitHub. Write actions answer ok and do nothing.
+// It reads no session logs and calls no terminal and no GitHub. Write actions answer ok and do nothing.
 
 import http from 'node:http';
 import fs from 'node:fs';
