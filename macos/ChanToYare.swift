@@ -25,6 +25,18 @@ func isSessionId(_ s: String) -> Bool {
   uuidPattern.firstMatch(in: s, range: NSRange(s.startIndex..., in: s)) != nil
 }
 
+// サーバー (lib/auth.mjs) が作るトークン。ページには window.__ccdToken として注入し
+// (public/auth.js が API に付ける)、アプリからの直接の POST には X-CC-Token で付ける
+let tokenURL = FileManager.default.homeDirectoryForCurrentUser
+  .appendingPathComponent(".config/cc-dashboard/token")
+let tokenPattern = try! NSRegularExpression(pattern: "^[0-9a-f]{64}$")
+
+func readToken() -> String? {
+  guard let raw = try? String(contentsOf: tokenURL, encoding: .utf8) else { return nil }
+  let token = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+  return tokenPattern.firstMatch(in: token, range: NSRange(token.startIndex..., in: token)) != nil ? token : nil
+}
+
 func isDashboard(_ url: URL?) -> Bool {
   guard let url else { return false }
   return url.scheme == "http" && url.host == "127.0.0.1" && url.port == 7878
@@ -79,6 +91,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
   var healthFailures = 0
   var healthInFlight = false
   var healthTimer: Timer?
+  var loadedWithoutToken = false
   var activity: NSObjectProtocol?
   let probe: URLSession = {
     let c = URLSessionConfiguration.ephemeral
@@ -173,9 +186,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     window.makeKeyAndOrderFront(nil)
   }
 
-  func installUserScripts(_ ucc: WKUserContentController) {
+  func installUserScripts(_ ucc: WKUserContentController, token: String? = readToken()) {
     ucc.removeAllUserScripts()
-    let source = "window.__ccdSound = \(soundEnabled ? "true" : "false");"
+    var source = "window.__ccdSound = \(soundEnabled ? "true" : "false");"
+    // readToken は 16進64文字だけを返すので、そのまま文字列リテラルに埋め込める
+    if let token { source += " window.__ccdToken = '\(token)';" }
     ucc.addUserScript(WKUserScript(source: source, injectionTime: .atDocumentStart, forMainFrameOnly: true))
   }
 
@@ -278,6 +293,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
   func loadDashboard() {
     showingError = false
     healthFailures = 0
+    guard let token = readToken() else {
+      // サーバーがまだトークンを作っていない。ページはロック画面に移り、トークンができたら開き直す
+      Log.write("token not found, showing the locked page")
+      loadedWithoutToken = true
+      installUserScripts(webView.configuration.userContentController, token: nil)
+      webView.load(URLRequest(url: serverURL))
+      return
+    }
+    loadedWithoutToken = false
+    installUserScripts(webView.configuration.userContentController, token: token)
     webView.load(URLRequest(url: serverURL))
   }
 
@@ -301,6 +326,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
           self.healthFailures = 0
           if self.showingError {
             Log.write("server is back, reloading")
+            self.loadDashboard()
+          } else if self.loadedWithoutToken && readToken() != nil {
+            Log.write("token appeared, reloading")
             self.loadDashboard()
           }
         } else {
@@ -471,6 +499,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     request.httpMethod = "POST"
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
     request.setValue("1", forHTTPHeaderField: "X-CC-Dashboard")
+    if let token = readToken() { request.setValue(token, forHTTPHeaderField: "X-CC-Token") }
     request.httpBody = try? JSONSerialization.data(withJSONObject: ["sessionId": sessionId])
     probe.dataTask(with: request) { _, response, _ in
       Log.write("focus via app status=\((response as? HTTPURLResponse)?.statusCode ?? 0)")

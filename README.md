@@ -73,8 +73,14 @@ The PRs view also needs the [GitHub CLI](https://cli.github.com) signed in.
 ```sh
 git clone git@github.com:Ryoma0219/chan_to_yare.git
 cd chan_to_yare
-node server.mjs   # http://127.0.0.1:7878
+node server.mjs   # serves http://127.0.0.1:7878
+npm run open      # in another terminal: opens the dashboard in your browser
 ```
+
+The dashboard's data is locked to people who hold its token
+(`~/.config/cc-dashboard/token`, created on first start). `npm run open`
+and the macOS app pass it for you. The browser keeps it afterwards, so
+later you can open `http://127.0.0.1:7878` directly.
 
 To keep the server running in the background and open the dashboard as a
 native app with a Dock badge and notifications:

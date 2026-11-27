@@ -487,7 +487,7 @@ window.PRs = (() => {
     root.classList.toggle('refreshing', Boolean(data));
     loading = (async () => {
       try {
-        const res = await fetch('/api/prs', { headers: { Accept: 'application/json' } });
+        const res = await ccdAuth.fetch('/api/prs', { headers: { Accept: 'application/json' } });
         if (!res.ok) throw new Error(String(res.status));
         render(await res.json());
       } catch {

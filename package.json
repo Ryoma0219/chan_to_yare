@@ -5,6 +5,7 @@
   "description": "Claude Code の並列セッションを1画面で見渡すローカルダッシュボード",
   "scripts": {
     "start": "node server.mjs",
+    "open": "node bin/open.mjs",
     "test": "node --test 'test/*.test.mjs'"
   },
   "engines": { "node": ">=20" }
