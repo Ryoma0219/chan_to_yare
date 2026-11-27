@@ -24,6 +24,7 @@ dependencies.
 | `macos/ChanToYare.swift` | The macOS app: a WKWebView window, Dock badge, notifications, sound, and menus                |
 | `macos/build.sh`         | Builds `~/Applications/Chan to Yare.app` with `swiftc` and signs it ad hoc                    |
 | `launchd/`               | The LaunchAgent that keeps the server running                                                 |
+| `demo/`                  | A server that serves the UI with dummy data, for the README screenshots                       |
 
 ## Running
 
@@ -40,6 +41,27 @@ start a second server on another port (`PORT=7979 node server.mjs`). It
 still talks to the real cmux. Do not close tabs or workspaces through the
 cmux CLI while testing: on 2026-11-27 a `close-workspace` followed by a
 `tree` query crashed cmux, and every running session went with it.
+
+### Screenshots
+
+The README screenshots come from `demo/server.mjs`, which serves `public/`
+with the dummy data in `demo/fixtures.mjs`. It reads no logs and calls
+neither cmux nor GitHub. All times are relative to the moment of the
+request.
+
+```sh
+node demo/server.mjs   # http://127.0.0.1:7880
+```
+
+The current images were taken at 1440 px wide, 2x, in dark mode, with
+`prefers-reduced-motion: reduce` so the count-up and draw-in animations
+do not show half done. A full-page capture can still catch the week chart
+mid-animation, so set the viewport to the page height and capture the
+viewport instead. Live has the "Rate limit the invoices endpoint" row
+open, and PRs has `storefront #401` open and is cut off at 2376 px. The
+notification button was hidden and sound was set to off, since both
+only show their attention state in a browser. They were then scaled to 1600 px wide
+(`sips --resampleWidth 1600`) and saved in `assets/screenshots/`.
 
 ## Data sources
 

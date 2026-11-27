@@ -11,6 +11,8 @@
     <br />
     <a href="#about">About</a>
     ·
+    <a href="#features">Features</a>
+    ·
     <a href="#install">Install</a>
     ·
     <a href="#usage">Usage</a>
@@ -34,6 +36,36 @@ GitHub and Google Fonts. It is a Node server with zero dependencies, a web
 UI, and a thin native macOS app around it.
 
 The name is Japanese for "do it properly."
+
+## Features
+
+The screenshots use dummy data.
+
+### Live
+
+![The Live view with sessions waiting on you and sessions Claude is working on](assets/screenshots/live.png)
+
+- Sessions are sorted by whose turn it is: Your turn, Claude's turn, and untouched for 12+ hours.
+- Each row says why the session is waiting (a question, a plan, a tool approval) or what Claude is running.
+- A 3-hour track shows when Claude worked and how long it has waited on you.
+- Open a row to read the last exchange, send a note, or end the session. Open jumps to its cmux tab.
+
+### Last 7 days
+
+![The Last 7 days view with the week chart, reply times, cost, repositories and tools](assets/screenshots/last-7-days.png)
+
+- The week, hour by hour: how many sessions were working and how many were waiting on you.
+- How fast you reply, what it cost per day, and which repositories took Claude's time.
+- Which tools and skills Claude used, and how many tool calls you had to approve.
+
+### PRs
+
+![The PRs view with four axes, a size and cost scatter plot, and the PR table](assets/screenshots/prs.png)
+
+- Every PR you opened in the last 30 days, next to the Claude Code sessions behind it.
+- Four axes side by side, with no overall score: delegation, cost, speed, and quality guard.
+- A size and cost plot that marks PRs rewritten within 21 days or reverted.
+- Open a row to see its sessions, reviews, and the PRs that rewrote its lines.
 
 ## Install
 
