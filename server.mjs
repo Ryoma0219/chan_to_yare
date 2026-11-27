@@ -15,6 +15,8 @@ import { Collector } from './lib/collect.mjs';
 import { Analytics } from './lib/analytics.mjs';
 import { GitHub } from './lib/github.mjs';
 import { computePRs } from './lib/prs.mjs';
+import { sanitizeImprove, launchImprove } from './lib/improve.mjs';
+import { execFile } from 'node:child_process';
 
 const HOST = '127.0.0.1';
 const PORT = Number(process.env.PORT || 7878);
@@ -45,6 +47,15 @@ const SECURITY_HEADERS = {
   'Content-Security-Policy':
     "default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
 };
+
+// 同一オリジン・独自ヘッダー・JSON の検査をかける書き込み系
+const POST_ROUTES = new Set(['/api/focus', '/api/memo', '/api/exit', '/api/improve']);
+
+function runCmux(cmd, args) {
+  return new Promise((resolve) => {
+    execFile(cmd, args, { timeout: 5000 }, (err, stdout) => resolve(err ? null : stdout));
+  });
+}
 
 const collector = new Collector();
 const analytics = new Analytics();
@@ -188,7 +199,7 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  if (req.method === 'POST' && (url.pathname === '/api/focus' || url.pathname === '/api/memo')) {
+  if (req.method === 'POST' && POST_ROUTES.has(url.pathname)) {
     // 他サイトからのフォーム送信を弾く: 同一オリジンかつ独自ヘッダー付き (プリフライト必須) の JSON だけ受ける
     const origin = req.headers.origin;
     if (origin && !ALLOWED_HOSTS.has(origin.replace(/^http:\/\//, ''))) return send(res, 403, 'forbidden');
@@ -201,18 +212,32 @@ const server = http.createServer(async (req, res) => {
       return send(res, 400, 'bad request');
     }
     const { sessionId } = body ?? {};
-    if (typeof sessionId !== 'string' || !/^[0-9a-f-]{36}$/i.test(sessionId)) return send(res, 400, 'bad request');
+    const validId = typeof sessionId === 'string' && /^[0-9a-f-]{36}$/i.test(sessionId);
+    // improve だけは sessionId を省ける (ヘッダーからの要望)
+    if (!validId && !(url.pathname === '/api/improve' && sessionId == null)) return send(res, 400, 'bad request');
 
     let result;
     if (url.pathname === '/api/focus') {
       result = await collector.focus(sessionId);
+    } else if (url.pathname === '/api/exit') {
+      result = await collector.exitSession(sessionId);
+    } else if (url.pathname === '/api/improve') {
+      const text = typeof body.text === 'string' ? sanitizeImprove(body.text) : '';
+      if (!text) return send(res, 400, 'bad request');
+      // 立ち上げ先と会話ログのパスはサーバーが sessionId から引く。body の他の値は使わない
+      let session;
+      if (validId) {
+        session = collector.sessionContext(sessionId);
+        if (!session) return send(res, 409, JSON.stringify({ ok: false, reason: 'session-not-found' }), { 'Content-Type': 'application/json' });
+      }
+      result = await launchImprove({ text, session, run: runCmux });
     } else {
       const text = typeof body.text === 'string' ? sanitizeMemo(body.text) : '';
       if (!text) return send(res, 400, 'bad request');
       const prompt = body.mode === 'remember' ? `次のことを覚えておいてください（メモリに保存）: ${text}` : text;
       result = await collector.sendMemo(sessionId, prompt);
     }
-    console.log(`[${url.pathname.slice(5)}] ${new Date().toISOString()} ${sessionId} ${result.ok ? 'ok' : result.reason}`);
+    console.log(`[${url.pathname.slice(5)}] ${new Date().toISOString()} ${sessionId ?? '-'} ${result.ok ? 'ok' : result.reason}`);
     return send(res, result.ok ? 200 : 409, JSON.stringify(result), { 'Content-Type': 'application/json' });
   }
 
