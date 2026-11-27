@@ -394,7 +394,7 @@ function makeRow(id) {
     memo: q('.composer textarea'),
     hint: q('.composer-hint'),
     // Send と Remember。Improve Claude はタブがなくても確認待ちでも使えるので別に持つ
-    memoButtons: [...el.querySelectorAll('.composer button:not(.improve-btn)')],
+    memoButtons: [...el.querySelectorAll('.composer button:not(.improve-btn):not(.exit)')],
     improveBtn: q('.composer .improve-btn'),
   };
   refs.main.addEventListener('click', () => toggle(id));
