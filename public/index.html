@@ -28,6 +28,7 @@
   <symbol id="i-chevron" viewBox="0 0 16 16"><path d="m6 4 4 4-4 4"/></symbol>
   <symbol id="i-send" viewBox="0 0 16 16"><path d="M2.5 8h9M8.5 4.5 12 8l-3.5 3.5"/></symbol>
   <symbol id="i-spark" viewBox="0 0 16 16"><path d="M8 1.5v3M8 11.5v3M1.5 8h3M11.5 8h3M3.4 3.4l2 2M10.6 10.6l2 2M12.6 3.4l-2 2M5.4 10.6l-2 2"/></symbol>
+  <symbol id="i-exit" viewBox="0 0 16 16"><path d="M6.5 2.5h-3a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h3M10.5 5 13.5 8l-3 3M13.5 8H6"/></symbol>
   <symbol id="i-pin" viewBox="0 0 16 16"><path d="M4.5 2.5h7v11L8 11l-3.5 2.5z"/></symbol>
 </svg>
 
@@ -41,6 +42,9 @@
   <p class="tally" id="tally" aria-live="polite"></p>
   <div class="bar-tools">
     <span class="link-state" id="link-state" role="status"></span>
+    <button type="button" class="tool" id="improve-btn" title="Ask a new session to change how Claude behaves">
+      <svg class="icon"><use href="#i-spark"/></svg><span>Improve Claude</span>
+    </button>
     <button type="button" class="tool" id="notify-btn" hidden>
       <svg class="icon"><use href="#i-bell"/></svg><span>Allow notifications</span>
     </button>
@@ -188,6 +192,19 @@
 
 <div class="tip" id="tip" role="tooltip" hidden></div>
 
+<dialog class="improve" id="improve-dialog" aria-labelledby="improve-title">
+  <form class="composer" method="dialog">
+    <h2 class="improve-title" id="improve-title">Improve Claude</h2>
+    <p class="improve-lead">Describe how Claude should behave. A new session opens in <code>~/.claude</code>, decides what to change (CLAUDE.md, skills, hooks, settings, or memory), and changes it.</p>
+    <textarea rows="5" maxlength="4000" placeholder="I want Claude to…"></textarea>
+    <div class="composer-actions">
+      <span class="composer-hint"></span>
+      <button type="button" class="btn" value="cancel">Cancel</button>
+      <button type="submit" class="btn primary" value="launch"><svg class="icon"><use href="#i-spark"/></svg><span>Launch</span></button>
+    </div>
+  </form>
+</dialog>
+
 <template id="row-tpl">
   <li class="row">
     <div class="row-line">
@@ -202,9 +219,14 @@
         <span class="gist"></span>
       </button>
       <div class="track" aria-hidden="true"></div>
-      <button type="button" class="jump" title="Open this tab in cmux">
-        <svg class="icon"><use href="#i-open"/></svg><span class="jump-label">Open</span>
-      </button>
+      <div class="actions">
+        <button type="button" class="jump" title="Open this tab in cmux">
+          <svg class="icon"><use href="#i-open"/></svg><span class="jump-label">Open</span>
+        </button>
+        <button type="button" class="exit" hidden>
+          <svg class="icon"><use href="#i-exit"/></svg><span class="exit-label">Exit</span>
+        </button>
+      </div>
     </div>
     <div class="detail" hidden>
       <div class="exchange">
@@ -213,6 +235,7 @@
           <textarea rows="2" maxlength="4000" placeholder="Something to fix, change, or remember…"></textarea>
           <div class="composer-actions">
             <span class="composer-hint"></span>
+            <button type="submit" class="btn improve-btn" value="improve" title="Open a new session that changes how Claude behaves, with this session as context"><svg class="icon"><use href="#i-spark"/></svg><span>Improve Claude</span></button>
             <button type="submit" class="btn" value="remember"><svg class="icon"><use href="#i-pin"/></svg><span>Remember</span></button>
             <button type="submit" class="btn primary" value="send"><svg class="icon"><use href="#i-send"/></svg><span>Send</span></button>
           </div>

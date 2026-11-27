@@ -256,6 +256,32 @@ h1, h2, h3, p { margin: 0; }
 .jump.busy { color: var(--ink-3); }
 .jump.failed { border-color: var(--ask); color: var(--ask); }
 
+/* Open と Exit は同じ列に縦に積む。Exit は Your turn の行にだけ出る */
+.actions { justify-self: end; align-self: start; display: grid; gap: 0.35rem; justify-items: end; }
+.exit {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  height: 26px; padding: 0 0.55rem;
+  border: 1px solid transparent; border-radius: var(--radius); background: transparent;
+  color: var(--ink-3); font-size: var(--step--1); cursor: pointer;
+  transition: background-color 160ms var(--ease-out), color 160ms var(--ease-out), border-color 160ms var(--ease-out);
+}
+.exit:hover:not(:disabled) { color: var(--ink); border-color: var(--line); }
+.exit:disabled { opacity: 0.4; cursor: not-allowed; }
+.exit.armed { color: var(--ask); border-color: var(--ask); font-weight: 600; }
+.exit.busy { color: var(--ink-3); }
+.exit.failed { border-color: var(--ask); color: var(--ask); }
+
+/* Improve Claude (ヘッダーから開くダイアログ) */
+dialog.improve {
+  width: min(36rem, calc(100vw - 2rem)); padding: 1.25rem 1.25rem 0.5rem;
+  border: 1px solid var(--line); border-radius: calc(var(--radius) * 1.5);
+  background: var(--raised); color: var(--ink); box-shadow: var(--shadow);
+}
+dialog.improve::backdrop { background: oklch(0.2 0.01 250 / 0.35); }
+dialog.improve .composer { border-bottom: 0; padding-bottom: 0.75rem; }
+.improve-title { margin: 0; font-size: var(--step-2); font-weight: 600; }
+.improve-lead { margin: 0 0 0.35rem; color: var(--ink-2); font-size: var(--step-0); line-height: 1.6; }
+
 /* ---------------------------------------------------------------
    Signature: the relay track
    一本の時間軸 (直近 3 時間) の上に、各セッションのボールの在りかを描く。

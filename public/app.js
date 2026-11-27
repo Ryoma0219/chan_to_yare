@@ -247,6 +247,8 @@ const FAILURE = {
   'session-not-found': 'The session has ended',
   'session-waiting': 'Answer the prompt in the terminal first',
   'cmux-failed': 'Could not reach cmux',
+  'session-busy': 'Claude is working. Wait for the turn to end',
+  'exit-timeout': 'The session did not exit',
 };
 
 // mcp__claude_ai_redash-mcp__execute_adhoc_query -> redash · execute_adhoc_query
@@ -380,6 +382,7 @@ function makeRow(id) {
     gist: q('.gist'),
     track: q('.track'),
     jump: q('.jump'),
+    exit: q('.exit'),
     detail: q('.detail'),
     youTime: q('.turn-you time'),
     youSaid: q('.turn-you .said'),
@@ -389,12 +392,16 @@ function makeRow(id) {
     composer: q('.composer'),
     memo: q('.composer textarea'),
     hint: q('.composer-hint'),
-    memoButtons: [...el.querySelectorAll('.composer button')],
+    // Send と Remember。Improve Claude はタブがなくても確認待ちでも使えるので別に持つ
+    memoButtons: [...el.querySelectorAll('.composer button:not(.improve-btn)')],
+    improveBtn: q('.composer .improve-btn'),
   };
   refs.main.addEventListener('click', () => toggle(id));
   refs.composer.addEventListener('submit', (e) => {
     e.preventDefault();
-    sendMemo(id, refs, e.submitter?.value === 'remember' ? 'remember' : 'send');
+    const mode = e.submitter?.value;
+    if (mode === 'improve') sendRowImprove(id, refs);
+    else sendMemo(id, refs, mode === 'remember' ? 'remember' : 'send');
   });
   refs.memo.addEventListener('keydown', (e) => {
     // ⌘/Ctrl + Enter で送る。Enter 単体は改行 (送信時には空白に畳まれる)
@@ -404,6 +411,7 @@ function makeRow(id) {
     }
   });
   refs.jump.addEventListener('click', () => jump(id, refs.jump));
+  refs.exit.addEventListener('click', () => exitSession(id, refs));
   el.addEventListener('animationend', (e) => {
     if (e.animationName.startsWith('arrive') || e.animationName === 'beam') el.classList.remove('arrived');
   });
@@ -541,6 +549,15 @@ function fillRow(row, s, now) {
   refs.jump.disabled = !s.tab;
   refs.jump.title = s.tab ? `Open “${s.tab.title || s.title}” in cmux` : 'No cmux tab found for this session';
 
+  // Exit は Your turn の行だけ。確認待ちのときは /exit を打てないので押せない
+  refs.exit.hidden = laneOf(s.state) !== 'you';
+  const exitBlocked = !s.tab ? 'tab-not-found' : s.state === 'ask' ? 'session-waiting' : null;
+  refs.exit.disabled = Boolean(exitBlocked) || refs.exiting === true;
+  if (exitBlocked) disarmExit(refs);
+  if (!refs.exit.classList.contains('failed')) {
+    refs.exit.title = exitBlocked ? FAILURE[exitBlocked] : refs.exitArmed ? 'Click again to end this session' : 'End this session. The cmux tab stays open';
+  }
+
   refs.detail.hidden = !open;
   if (open) {
     refs.youTime.textContent = stamp(s.lastPromptAt);
@@ -553,11 +570,11 @@ function fillRow(row, s, now) {
     }
     const blocked = !s.tab ? 'tab-not-found' : s.state === 'ask' ? 'session-waiting' : null;
     refs.composer.dataset.blocked = blocked ?? '';
-    refs.memo.disabled = Boolean(blocked);
     for (const b of refs.memoButtons) b.disabled = Boolean(blocked) || refs.sending === true;
+    refs.improveBtn.disabled = refs.sending === true;
     if (!refs.sending && !refs.sentAt) {
       refs.hint.textContent = blocked
-        ? FAILURE[blocked]
+        ? `${FAILURE[blocked]}. Improve Claude still works.`
         : s.state === 'work'
           ? 'Claude is working. Your message is queued until this turn ends.'
           : '⌘↩ to send';
@@ -733,6 +750,7 @@ async function sendMemo(id, refs, mode) {
   if (!text || refs.sending || refs.composer.dataset.blocked) return;
   refs.sending = true;
   for (const b of refs.memoButtons) b.disabled = true;
+  refs.improveBtn.disabled = true;
   refs.hint.textContent = mode === 'remember' ? 'Asking it to remember…' : 'Sending…';
   try {
     const res = await fetch('/api/memo', {
@@ -749,13 +767,151 @@ async function sendMemo(id, refs, mode) {
     refs.hint.textContent = FAILURE[e.message] ?? FAILURE['cmux-failed'];
     refs.composer.classList.add('failed');
   } finally {
-    refs.sending = false;
-    refs.sentAt = Date.now();
-    for (const b of refs.memoButtons) b.disabled = Boolean(refs.composer.dataset.blocked);
+    finishSending(refs);
+  }
+}
+
+function finishSending(refs) {
+  refs.sending = false;
+  refs.sentAt = Date.now();
+  for (const b of refs.memoButtons) b.disabled = Boolean(refs.composer.dataset.blocked);
+  refs.improveBtn.disabled = false;
+  setTimeout(() => {
+    refs.sentAt = 0;
+    refs.composer.classList.remove('failed');
+  }, 4000);
+}
+
+/* ------------------------------------------------------------
+   Improve Claude: open a new session that changes how Claude behaves
+   ------------------------------------------------------------ */
+async function postImprove(text, sessionId) {
+  try {
+    const res = await fetch('/api/improve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CC-Dashboard': '1' },
+      body: JSON.stringify(sessionId ? { sessionId, text } : { text }),
+    });
+    const body = await res.json().catch(() => ({}));
+    return res.ok ? { ok: true } : { ok: false, reason: body.reason ?? 'cmux-failed' };
+  } catch {
+    return { ok: false, reason: 'cmux-failed' };
+  }
+}
+
+async function sendRowImprove(id, refs) {
+  const text = refs.memo.value.trim();
+  if (!text || refs.sending) return;
+  refs.sending = true;
+  for (const b of refs.memoButtons) b.disabled = true;
+  refs.improveBtn.disabled = true;
+  refs.hint.textContent = 'Opening a new session…';
+  const result = await postImprove(text, id);
+  if (result.ok) {
+    refs.memo.value = '';
+    refs.hint.textContent = 'Opened a new session to work on this.';
+    refs.composer.classList.remove('failed');
+  } else {
+    refs.hint.textContent = FAILURE[result.reason] ?? FAILURE['cmux-failed'];
+    refs.composer.classList.add('failed');
+  }
+  finishSending(refs);
+}
+
+const improve = {
+  dialog: $('improve-dialog'),
+  open: $('improve-btn'),
+};
+improve.form = improve.dialog.querySelector('form');
+improve.text = improve.dialog.querySelector('textarea');
+improve.hint = improve.dialog.querySelector('.composer-hint');
+improve.launch = improve.dialog.querySelector('button[value="launch"]');
+improve.cancel = improve.dialog.querySelector('button[value="cancel"]');
+
+improve.open.addEventListener('click', () => {
+  improve.hint.textContent = '⌘↩ to launch';
+  improve.form.classList.remove('failed');
+  improve.dialog.showModal();
+  improve.text.focus();
+});
+improve.cancel.addEventListener('click', () => improve.dialog.close());
+improve.form.addEventListener('submit', (e) => {
+  e.preventDefault();
+  launchFromDialog();
+});
+improve.text.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+    e.preventDefault();
+    launchFromDialog();
+  }
+});
+
+async function launchFromDialog() {
+  const text = improve.text.value.trim();
+  if (!text || improve.launch.disabled) return;
+  improve.launch.disabled = true;
+  improve.hint.textContent = 'Opening a new session…';
+  const result = await postImprove(text, null);
+  improve.launch.disabled = false;
+  if (result.ok) {
+    improve.text.value = '';
+    improve.dialog.close();
+  } else {
+    improve.hint.textContent = FAILURE[result.reason] ?? FAILURE['cmux-failed'];
+    improve.form.classList.add('failed');
+  }
+}
+
+/* ------------------------------------------------------------
+   Exit: end a session from the board
+   window.confirm は Mac アプリの WKWebView では黙って false になるので、2 回押しで確かめる
+   ------------------------------------------------------------ */
+const EXIT_ARM_MS = 3000;
+
+function disarmExit(refs) {
+  if (!refs.exitArmed) return;
+  clearTimeout(refs.exitArmed);
+  refs.exitArmed = 0;
+  refs.exit.classList.remove('armed');
+  refs.exit.querySelector('.exit-label').textContent = 'Exit';
+}
+
+async function exitSession(id, refs) {
+  const button = refs.exit;
+  if (button.disabled || refs.exiting) return;
+  const label = button.querySelector('.exit-label');
+  if (!refs.exitArmed) {
+    button.classList.add('armed');
+    label.textContent = 'Exit?';
+    button.title = 'Click again to end this session';
+    refs.exitArmed = setTimeout(() => disarmExit(refs), EXIT_ARM_MS);
+    return;
+  }
+  disarmExit(refs);
+  refs.exiting = true;
+  button.disabled = true;
+  button.classList.add('busy');
+  label.textContent = 'Exiting…';
+  try {
+    const res = await fetch('/api/exit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CC-Dashboard': '1' },
+      body: JSON.stringify({ sessionId: id }),
+    });
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).reason ?? 'cmux-failed');
+    // 成功したら次のスナップショットで行が消える
+  } catch (e) {
+    button.classList.add('failed');
+    label.textContent = 'Failed';
+    button.title = FAILURE[e.message] ?? FAILURE['cmux-failed'];
     setTimeout(() => {
-      refs.sentAt = 0;
-      refs.composer.classList.remove('failed');
-    }, 4000);
+      label.textContent = 'Exit';
+      button.classList.remove('failed');
+    }, 2500);
+  } finally {
+    refs.exiting = false;
+    button.disabled = false;
+    button.classList.remove('busy');
   }
 }
 
