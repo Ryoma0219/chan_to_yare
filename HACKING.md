@@ -109,7 +109,7 @@ never pick an option in a permission prompt.
 
 ### Exiting a session
 
-Rows in Your turn have an Exit button. The first click arms it (`Exit?`)
+Expanded rows in Your turn have an Exit button left of Improve Claude. The first click arms it (`Exit?`)
 for three seconds and the second click sends `/exit` through the same
 buffer as a note. `window.confirm` is not used because the macOS app's
 WKWebView silently returns false for it.

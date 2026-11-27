@@ -219,14 +219,9 @@
         <span class="gist"></span>
       </button>
       <div class="track" aria-hidden="true"></div>
-      <div class="actions">
-        <button type="button" class="jump" title="Open this tab in cmux">
-          <svg class="icon"><use href="#i-open"/></svg><span class="jump-label">Open</span>
-        </button>
-        <button type="button" class="exit" hidden>
-          <svg class="icon"><use href="#i-exit"/></svg><span class="exit-label">Exit</span>
-        </button>
-      </div>
+      <button type="button" class="jump" title="Open this tab in cmux">
+        <svg class="icon"><use href="#i-open"/></svg><span class="jump-label">Open</span>
+      </button>
     </div>
     <div class="detail" hidden>
       <div class="exchange">
@@ -235,6 +230,7 @@
           <textarea rows="2" maxlength="4000" placeholder="Something to fix, change, or remember…"></textarea>
           <div class="composer-actions">
             <span class="composer-hint"></span>
+            <button type="button" class="btn exit" hidden><svg class="icon"><use href="#i-exit"/></svg><span class="exit-label">Exit</span></button>
             <button type="submit" class="btn improve-btn" value="improve" title="Open a new session that changes how Claude behaves, with this session as context"><svg class="icon"><use href="#i-spark"/></svg><span>Improve Claude</span></button>
             <button type="submit" class="btn" value="remember"><svg class="icon"><use href="#i-pin"/></svg><span>Remember</span></button>
             <button type="submit" class="btn primary" value="send"><svg class="icon"><use href="#i-send"/></svg><span>Send</span></button>
