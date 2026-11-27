@@ -249,6 +249,7 @@ const FAILURE = {
   'cmux-failed': 'Could not reach cmux',
   'session-busy': 'Claude is working. Wait for the turn to end',
   'exit-timeout': 'The session did not exit',
+  'improve-failed': 'Could not start the session',
 };
 
 // mcp__claude_ai_redash-mcp__execute_adhoc_query -> redash · execute_adhoc_query

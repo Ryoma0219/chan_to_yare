@@ -211,7 +211,9 @@ const server = http.createServer(async (req, res) => {
     } catch {
       return send(res, 400, 'bad request');
     }
-    const { sessionId } = body ?? {};
+    // null や配列が来ると body.text で例外になり、プロセスごと落ちる
+    if (!body || typeof body !== 'object' || Array.isArray(body)) return send(res, 400, 'bad request');
+    const { sessionId } = body;
     const validId = typeof sessionId === 'string' && /^[0-9a-f-]{36}$/i.test(sessionId);
     // improve だけは sessionId を省ける (ヘッダーからの要望)
     if (!validId && !(url.pathname === '/api/improve' && sessionId == null)) return send(res, 400, 'bad request');
@@ -230,7 +232,13 @@ const server = http.createServer(async (req, res) => {
         session = collector.sessionContext(sessionId);
         if (!session) return send(res, 409, JSON.stringify({ ok: false, reason: 'session-not-found' }), { 'Content-Type': 'application/json' });
       }
-      result = await launchImprove({ text, session, run: runCmux });
+      try {
+        result = await launchImprove({ text, session, run: runCmux });
+      } catch (e) {
+        // ~/.cache に書けないなど。例外を逃がすとサーバーが落ち、待ち中の Exit も巻き添えになる
+        console.error('[improve]', e);
+        result = { ok: false, reason: 'improve-failed' };
+      }
     } else {
       const text = typeof body.text === 'string' ? sanitizeMemo(body.text) : '';
       if (!text) return send(res, 400, 'bad request');
