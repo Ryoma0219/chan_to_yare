@@ -11,13 +11,15 @@ dependencies.
 
 | Path                     | Role                                                                                          |
 | ------------------------ | --------------------------------------------------------------------------------------------- |
-| `server.mjs`             | HTTP server, SSE stream, and the API (`state`, `events`, `insights`, `prs`, `focus`, `memo`)  |
-| `lib/collect.mjs`        | Finds running sessions, decides their state, maps them to cmux tabs, jumps tabs, sends notes  |
+| `server.mjs`             | HTTP server, SSE stream, and the API (`state`, `events`, `insights`, `prs`, `focus`, `memo`, `exit`, `improve`) |
+| `lib/collect.mjs`        | Finds running sessions, decides their state, maps them to cmux tabs, jumps tabs, sends notes, ends sessions |
+| `lib/improve.mjs`        | Writes an Improve Claude request to a file and opens a new cmux workspace that runs it        |
 | `lib/transcript.mjs`     | Reads one conversation log incrementally and keeps its title, last exchange, and turns        |
 | `lib/analytics.mjs`      | Reads 31 days of conversation logs incrementally and builds the Last 7 days view              |
 | `lib/github.mjs`         | Fetches your pull requests, reviews, diffs, and reverts through `gh`, with a disk cache       |
 | `lib/prs.mjs`            | Links pull requests to sessions and computes the four axes of the PRs view                    |
 | `public/`                | The web UI: plain DOM and SVG, no framework                                                   |
+| `test/`                  | Tests for `lib/improve.mjs`, run with `npm test` (`node:test`, no dependencies)              |
 | `public/themes.css`      | The color theme, as hues only                                                                 |
 | `macos/ChanToYare.swift` | The macOS app: a WKWebView window, Dock badge, notifications, sound, and menus                |
 | `macos/build.sh`         | Builds `~/Applications/Chan to Yare.app` with `swiftc` and signs it ad hoc                    |
@@ -31,7 +33,13 @@ node server.mjs   # http://127.0.0.1:7878, override the port with PORT=7979
 
 Changes under `public/` show up on reload. Changes to `server.mjs` or
 `lib/` need a server restart. Run `node --check <file>` after editing
-JavaScript.
+JavaScript, and `npm test` after changing `lib/improve.mjs`.
+
+To try a change without touching the dashboard that launchd keeps running,
+start a second server on another port (`PORT=7979 node server.mjs`). It
+still talks to the real cmux. Do not close tabs or workspaces through the
+cmux CLI while testing: on 2026-11-27 a `close-workspace` followed by a
+`tree` query crashed cmux, and every running session went with it.
 
 ## Data sources
 
@@ -43,9 +51,11 @@ JavaScript.
 | `cmux tree --json`                       | Tab and workspace names                                                                      |
 | `gh`                                     | Your pull requests: size, files, reviews, diffs, and reverts                                 |
 
-Chan to Yare writes in only two ways: it focuses a cmux tab
-(`select-workspace` and `focus-panel`), and it sends a note to a session
-(`set-buffer`, `paste-buffer`, `send-key enter`).
+Chan to Yare writes in four ways: it focuses a cmux tab
+(`select-workspace` and `focus-panel`), it sends a note to a session
+(`set-buffer`, `paste-buffer`, `send-key enter`), it ends a session by
+sending `/exit` the same way, and it opens a new workspace for Improve
+Claude (`new-workspace`). It never closes tabs or workspaces.
 
 ## Live
 
@@ -96,6 +106,42 @@ await run(CMUX_BIN, ['send-key', ...ws, '--surface', surface.id, 'enter']);
 Newlines are folded into spaces and control characters are dropped before
 sending. Notes are refused while a session is `waiting`, so typed text can
 never pick an option in a permission prompt.
+
+### Exiting a session
+
+Rows in Your turn have an Exit button. The first click arms it (`Exit?`)
+for three seconds and the second click sends `/exit` through the same
+buffer as a note. `window.confirm` is not used because the macOS app's
+WKWebView silently returns false for it.
+
+The server refuses `waiting` sessions for the same reason as notes, and
+`busy` or `shell` sessions because `/exit` would be queued and end the
+session when the turn finishes. After sending, it waits up to five seconds
+for the process to go away and reports `exit-timeout` otherwise. The cmux
+tab is left open at the shell, showing `claude --resume <id>`.
+
+### Improving Claude
+
+Improve Claude opens a new cmux workspace in which Claude Code works on a
+request about its own behavior. It can be started from the header, which
+opens the session in `~/.claude`, or from a row's composer, which opens it
+in that session's directory and adds the session's title, directory, and
+log path to the request so Claude can read what actually happened. The
+server looks these up from the session id and ignores anything else the
+page sends.
+
+The request text never reaches a shell. The server writes it to
+`~/.cache/cc-dashboard/improve/<random>.md` (mode 600, removed after ten
+minutes) and types only a fixed command into the new workspace:
+
+```sh
+ claude "$(cat '/Users/you/.cache/cc-dashboard/improve/<random>.md')"
+```
+
+The leading space is deliberate. A new shell may show a countdown offering
+to resume an earlier session in the same directory, and that countdown
+reads the first key as "cancel". The space is that key. Without the
+countdown, the shell ignores it.
 
 ## Last 7 days and PRs
 
@@ -254,8 +300,11 @@ The server returns conversation content, so it is locked down:
   `127.0.0.1:<port>` or `localhost:<port>`, which blocks DNS rebinding.
 - It sends no CORS headers. The CSP allows no outside connections except
   Google Fonts.
-- `POST /api/focus` and `POST /api/memo` require JSON and an
-  `X-CC-Dashboard: 1` header, so a plain cross-site form cannot reach them.
+- `POST /api/focus`, `/api/memo`, `/api/exit`, and `/api/improve` require
+  JSON and an `X-CC-Dashboard: 1` header, so a plain cross-site form cannot
+  reach them.
+- Improve Claude requests go to a file, never into a command line. The
+  directory and log path come from the server, not the page.
 - cmux only receives tab UUIDs that exist in the current tab list, passed
   through `execFile`.
 - From `ps eww`, only `CMUX_SURFACE_ID` is kept. Other environment

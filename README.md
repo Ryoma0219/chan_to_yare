@@ -67,7 +67,10 @@ See [HACKING.md](HACKING.md) for details.
 
 From the Live view you can open a session's cmux tab, read its last
 exchange, and send it a note ("Send" or "Remember") without leaving the
-board. When a session starts waiting on you, the app plays a sound once,
+board. Sessions in Your turn have an Exit button that sends
+`/exit` (click twice). "Improve Claude", in the header or in a session's
+note box, opens a new session that changes how Claude behaves: its
+CLAUDE.md, skills, hooks, settings, or memory. When a session starts waiting on you, the app plays a sound once,
 posts a macOS notification, and updates the Dock badge.
 
 In the app, `⌘1` `⌘2` `⌘3` switch views and `⌘R` reloads.
